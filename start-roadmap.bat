@@ -1,56 +1,44 @@
-@echo off
-title Путь - Запуск проекта
-color 0A
+# Открой терминал в папке проекта
+# Удали старый файл
+del start-roadmap.bat
 
-echo =============================================
-echo      ПУТЬ - ЗАПУСК РОАДМАП РЕЛИЗОВ
-echo =============================================
-echo.
+# Создай новый файл через echo (это гарантирует правильный формат)
+echo @echo off > start-roadmap.bat
+echo title Путь - Запуск проекта >> start-roadmap.bat
+echo color 0A >> start-roadmap.bat
+echo. >> start-roadmap.bat
+echo echo ============================================= >> start-roadmap.bat
+echo echo      ПУТЬ - ЗАПУСК РОАДМАП РЕЛИЗОВ >> start-roadmap.bat
+echo echo ============================================= >> start-roadmap.bat
+echo echo. >> start-roadmap.bat
+echo :: Проверка Node.js >> start-roadmap.bat
+echo where node ^>nul 2^>nul >> start-roadmap.bat
+echo if %%errorlevel%% neq 0 ( >> start-roadmap.bat
+echo     echo [ОШИБКА] Node.js не найден! >> start-roadmap.bat
+echo     echo. >> start-roadmap.bat
+echo     pause >> start-roadmap.bat
+echo     exit >> start-roadmap.bat
+echo ) >> start-roadmap.bat
+echo. >> start-roadmap.bat
+echo cd backend >> start-roadmap.bat
+echo call npm install >> start-roadmap.bat
+echo. >> start-roadmap.bat
+echo cd ..\frontend >> start-roadmap.bat
+echo call npm install >> start-roadmap.bat
+echo. >> start-roadmap.bat
+echo cd .. >> start-roadmap.bat
+echo. >> start-roadmap.bat
+echo start cmd /k "cd backend && title Путь-Бэкенд && echo Бэкенд запущен на http://localhost:3001 && npm run dev" >> start-roadmap.bat
+echo timeout /t 3 /nobreak ^>nul >> start-roadmap.bat
+echo start cmd /k "cd frontend && title Путь-Фронтенд && echo Фронтенд запущен на http://localhost:5173 && npm run dev" >> start-roadmap.bat
+echo. >> start-roadmap.bat
+echo echo ============================================= >> start-roadmap.bat
+echo echo      ПРОЕКТ ЗАПУЩЕН! >> start-roadmap.bat
+echo echo ============================================= >> start-roadmap.bat
+echo echo. >> start-roadmap.bat
+echo pause >> start-roadmap.bat
 
-:: Проверка установки Node.js
-where node >nul 2>nul
-if %errorlevel% neq 0 (
-    echo [ОШИБКА] Node.js не найден!
-    echo.
-    echo Скачайте и установите Node.js с сайта:
-    echo https://nodejs.org/
-    echo.
-    echo После установки запустите этот файл снова.
-    pause
-    exit
-)
-
-:: Переход в папку бэкенда и установка зависимостей
-echo [1/3] Настройка бэкенда...
-cd backend
-call npm install
-
-:: Переход в папку фронтенда и установка зависимостей
-echo.
-echo [2/3] Настройка фронтенда...
-cd ..\frontend
-call npm install
-
-:: Возврат в корневую папку
-cd ..
-
-:: Запуск серверов
-echo.
-echo [3/3] Запуск серверов...
-echo.
-
-start cmd /k "cd backend && title Путь-Бэкенд && echo Бэкенд запущен на http://localhost:3001 && npm run dev"
-timeout /t 3 /nobreak >nul
-start cmd /k "cd frontend && title Путь-Фронтенд && echo Фронтенд запущен на http://localhost:5173 && npm run dev"
-
-echo.
-echo =============================================
-echo      ПРОЕКТ УСПЕШНО ЗАПУЩЕН!
-echo =============================================
-echo.
-echo Бэкенд:  http://localhost:3001
-echo Фронтенд: http://localhost:5173
-echo.
-echo Дождитесь запуска серверов в новых окнах.
-echo.
-pause
+# Добавь в git
+git add start-roadmap.bat
+git commit -m "Add working batch file with Windows line endings"
+git push
