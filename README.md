@@ -1,7 +1,7 @@
 ![Vue](https://img.shields.io/badge/Vue-3.x-4FC08D)
 ![Node](https://img.shields.io/badge/Node-18.x-339933)
 ![License](https://img.shields.io/badge/license-MIT-blue)
-
+![GitHub release](https://img.shields.io/github/v/release/FunnyMole/put-roadmap)
 # 🚀 Путь — роадмап релизов 2026
 
 Приложение для планирования и отслеживания релизов с задачами, статусами и тепловой картой трудозатрат.
