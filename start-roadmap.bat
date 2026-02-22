@@ -1,44 +1,97 @@
-# Открой терминал в папке проекта
-# Удали старый файл
-del start-roadmap.bat
+@echo off
+chcp 65001 >nul
+title 🚀 Путь - Установка и запуск
+color 0A
 
-# Создай новый файл через echo (это гарантирует правильный формат)
-echo @echo off > start-roadmap.bat
-echo title Путь - Запуск проекта >> start-roadmap.bat
-echo color 0A >> start-roadmap.bat
-echo. >> start-roadmap.bat
-echo echo ============================================= >> start-roadmap.bat
-echo echo      ПУТЬ - ЗАПУСК РОАДМАП РЕЛИЗОВ >> start-roadmap.bat
-echo echo ============================================= >> start-roadmap.bat
-echo echo. >> start-roadmap.bat
-echo :: Проверка Node.js >> start-roadmap.bat
-echo where node ^>nul 2^>nul >> start-roadmap.bat
-echo if %%errorlevel%% neq 0 ( >> start-roadmap.bat
-echo     echo [ОШИБКА] Node.js не найден! >> start-roadmap.bat
-echo     echo. >> start-roadmap.bat
-echo     pause >> start-roadmap.bat
-echo     exit >> start-roadmap.bat
-echo ) >> start-roadmap.bat
-echo. >> start-roadmap.bat
-echo cd backend >> start-roadmap.bat
-echo call npm install >> start-roadmap.bat
-echo. >> start-roadmap.bat
-echo cd ..\frontend >> start-roadmap.bat
-echo call npm install >> start-roadmap.bat
-echo. >> start-roadmap.bat
-echo cd .. >> start-roadmap.bat
-echo. >> start-roadmap.bat
-echo start cmd /k "cd backend && title Путь-Бэкенд && echo Бэкенд запущен на http://localhost:3001 && npm run dev" >> start-roadmap.bat
-echo timeout /t 3 /nobreak ^>nul >> start-roadmap.bat
-echo start cmd /k "cd frontend && title Путь-Фронтенд && echo Фронтенд запущен на http://localhost:5173 && npm run dev" >> start-roadmap.bat
-echo. >> start-roadmap.bat
-echo echo ============================================= >> start-roadmap.bat
-echo echo      ПРОЕКТ ЗАПУЩЕН! >> start-roadmap.bat
-echo echo ============================================= >> start-roadmap.bat
-echo echo. >> start-roadmap.bat
-echo pause >> start-roadmap.bat
+:start
+cls
+echo.
+echo   ╔═══════════════════════════════════════════════════════╗
+echo   ║                                                       ║
+echo   ║      ⚡ ПУТЬ - УСТАНОВКА И ЗАПУСК ПРОЕКТА ⚡          ║
+echo   ║                                                       ║
+echo   ╚═══════════════════════════════════════════════════════╝
+echo.
 
-# Добавь в git
-git add start-roadmap.bat
-git commit -m "Add working batch file with Windows line endings"
-git push
+:: Проверка Node.js
+node --version >nul 2>nul
+if %errorlevel% neq 0 (
+    echo ❌ Node.js не установлен!
+    echo.
+    echo Скачай и установи Node.js с сайта:
+    echo https://nodejs.org/
+    echo.
+    echo После установки запусти этот файл снова.
+    echo.
+    pause
+    exit
+)
+
+:: Показываем версии
+echo ✅ Node.js: 
+node --version
+echo ✅ npm: 
+call npm --version
+echo.
+
+:: Установка бэкенда
+echo 📦 Установка зависимостей бэкенда...
+cd backend
+if exist "node_modules" (
+    echo    ✅ Бэкенд: зависимости уже установлены
+) else (
+    echo    ⏳ Установка... (это может занять несколько минут)
+    call npm install
+    if %errorlevel% neq 0 (
+        echo ❌ Ошибка установки бэкенда
+        pause
+        exit
+    )
+    echo    ✅ Бэкенд: зависимости установлены
+)
+cd ..
+
+echo.
+
+:: Установка фронтенда
+echo 📦 Установка зависимостей фронтенда...
+cd frontend
+if exist "node_modules" (
+    echo    ✅ Фронтенд: зависимости уже установлены
+) else (
+    echo    ⏳ Установка... (это может занять несколько минут)
+    call npm install
+    if %errorlevel% neq 0 (
+        echo ❌ Ошибка установки фронтенда
+        pause
+        exit
+    )
+    echo    ✅ Фронтенд: зависимости установлены
+)
+cd ..
+
+echo.
+echo ===============================================
+echo 🚀 ЗАПУСК ПРОЕКТА...
+echo ===============================================
+echo.
+
+:: Запуск бэкенда
+start "Путь - Бэкенд" cmd /k "cd backend && title Путь - Бэкенд && echo. && echo ✅ Бэкенд запущен && echo 📁 http://localhost:3001 && echo. && npm run dev"
+
+timeout /t 2 /nobreak >nul
+
+:: Запуск фронтенда
+start "Путь - Фронтенд" cmd /k "cd frontend && title Путь - Фронтенд && echo. && echo ✅ Фронтенд запущен && echo 🌐 http://localhost:5173 && echo. && npm run dev"
+
+echo.
+echo ✅ ПРОЕКТ ЗАПУЩЕН!
+echo.
+echo 📁 Бэкенд: http://localhost:3001
+echo 🌐 Фронтенд: http://localhost:5173
+echo.
+echo ⏳ Подожди немного, серверы запускаются...
+echo.
+echo ❌ Для остановки закрой все окна терминалов
+echo.
+pause
