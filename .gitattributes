@@ -1,2 +1,33 @@
-# Auto detect text files and perform LF normalization
+# Автоматически нормализует окончания строк
 * text=auto
+
+# Для batch файлов всегда используем CRLF (Windows-формат)
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Для скриптов PowerShell оставляем как есть
+*.ps1 text
+
+# Для текстовых файлов
+*.txt text
+*.md text
+
+# Для файлов конфигурации
+*.json text
+*.yml text
+*.yaml text
+*.ini text
+
+# Для файлов проекта
+*.js text
+*.vue text
+*.css text
+*.html text
+
+# Бинарные файлы
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.sqlite binary
