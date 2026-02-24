@@ -18,10 +18,7 @@
 
 ## 🚀 Установка и запуск
 
-
-1. **Скачай проект**
-   ```bash
-   git clone https://github.com/FunnyMole/put-roadmup.git
-   cd put-roadmup
-
-2. Просто дважды кликни на файл start-roadmap.bat
+1. Клонируй репозиторий:
+```bash
+git clone https://github.com/FunnyMole/put-roadmup
+cd put-roadmap

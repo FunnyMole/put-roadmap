@@ -1,8 +1,8 @@
 <template>
-  <div class="app">
+   <div class="app">
     <header class="header">
       <div class="header-top">
-        <h1>⚡ <span>Путь</span> — роадмап релизов 2026</h1>
+        <h1>⚡ <span>Путь</span> — роадмап 2026</h1>
         <div class="quote" ref="quoteElement">{{ currentQuote }}</div>
       </div>
 
@@ -22,12 +22,16 @@
           >
             📊 По кварталам
           </button>
-
+                  <button 
+            class="btn" 
+            :class="{ active: viewMode === 'horizontal' }" 
+            @click="setViewMode('horizontal')"
+          >
+            ↔️ Горизонтально
+  </button>
         </div>
-
-        
         <div class="toolbar-group">
-          <button class="btn btn-primary" @click="createNewBlock">+ Новый релиз</button>
+          <button class="btn btn-primary" @click="createNewBlock">+ Новый этап</button>
           <button class="btn" @click="loadBlocks">🔄</button>
           <button class="btn" @click="exportAsPNG">📸 PNG</button>
           <button class="btn" @click="exportAsPDF">📄 PDF</button>
@@ -35,80 +39,78 @@
       </div>
 
       <!-- Статистика сверху -->
-                <div class="statistics-top">
-            <div class="stat-item">
-              <span class="stat-icon">📊</span>
-              <span class="stat-label">Релизов:</span>
-              <span class="stat-value">{{ blocks.length }}</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-icon">✅</span>
-              <span class="stat-label">Выполнено:</span>
-              <span class="stat-value">{{ completedReleasesCount }}</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-icon">⏳</span>
-              <span class="stat-label">В работе:</span>
-              <span class="stat-value">{{ inProgressReleasesCount }}</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-icon">📋</span>
-              <span class="stat-label">Всего задач:</span>
-              <span class="stat-value">{{ totalTasksCount }}</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-icon">✅</span>
-              <span class="stat-label">Задач выполнено:</span>
-              <span class="stat-value">{{ completedTasksCount }}</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-icon">📈</span>
-              <span class="stat-label">Прогресс:</span>
-              <span class="stat-value">{{ overallProgress }}%</span>
-            </div>
-          </div>
-
-      <!-- Навигация по месяцам/кварталам 
-      <div class="nav-months">
-        <button 
-          class="nav-month" 
-          v-for="(period, i) in visiblePeriods" 
-          :key="i"
-          :class="{ active: isPeriodVisible(period) }"
-          @click="scrollToPeriod(period)"
-        >
-          {{ period.label.substring(0, 3) }}
-          <span class="month-count" v-if="getBlocksCountInPeriod(period) > 0">
-            {{ getBlocksCountInPeriod(period) }}
-          </span>
-        </button>
-        <div class="nav-controls">
-          <button class="nav-btn" @click="scrollLeft">←</button>
-          <button class="nav-btn" @click="scrollRight">→</button>
+      <div class="statistics-top">
+        <div class="stat-item">
+          <span class="stat-icon">📊</span>
+          <span class="stat-label">Этапов:</span>
+          <span class="stat-value">{{ blocks.length }}</span>
         </div>
-      </div> -->
+        <div class="stat-item">
+          <span class="stat-icon">✅</span>
+          <span class="stat-label">Завершено:</span>
+          <span class="stat-value">{{ completedReleasesCount }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-icon">⏳</span>
+          <span class="stat-label">В работе:</span>
+          <span class="stat-value">{{ inProgressReleasesCount }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-icon">📋</span>
+          <span class="stat-label">Всего задач:</span>
+          <span class="stat-value">{{ totalTasksCount }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-icon">✅</span>
+          <span class="stat-label">Задач выполнено:</span>
+          <span class="stat-value">{{ completedTasksCount }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-icon">📈</span>
+          <span class="stat-label">Прогресс:</span>
+          <span class="stat-value">{{ overallProgress }}%</span>
+        </div>
+      </div>
     </header>
 
     <!-- Основной контент -->
     <div class="main-content">
-      <!-- Шапка месяцев/кварталов -->
-          <div class="months-header" ref="monthsHeader">
-              <div class="months-header-container" :style="{ width: totalWidth + 'px' }">
-                <div 
-                  v-for="(period, index) in visiblePeriods" 
-                  :key="index"
-                  class="month-header-cell"
-                  :style="{ 
-                    width: periodWidth + 'px',
-                    left: index * periodWidth + 'px',
-                    right: 'auto'  /* важно для позиционирования */
-                  }"
-                >
-                  {{ period.label }}
-                  <span class="month-sub" v-if="period.sub">{{ period.sub }}</span>
-                </div>
-              </div>
+
+  <!-- Шапка для горизонтального режима (только месяцы) -->
+        <div v-if="viewMode === 'horizontal'" class="horizontal-header" ref="horizontalHeader">
+          <div class="horizontal-header-container" :style="{ width: totalWidth + 'px' }">
+               <!-- Месяцы (каждый занимает свою ширину) -->
+            <div 
+              v-for="(month, monthIndex) in months" 
+              :key="'month-'+monthIndex"
+              class="horizontal-month-cell"
+              :style="{ 
+                left: monthIndex * HORIZONTAL_MONTH_WIDTH + 'px',
+                width: HORIZONTAL_MONTH_WIDTH + 'px'
+              }"
+            >
+              {{ month.label }}
             </div>
+          </div>
+        </div>
+      <!-- Шапка месяцев/кварталов -->
+                  <div v-if="viewMode === 'months' || viewMode === 'quarters'" class="months-header" ref="monthsHeader">
+          <div class="months-header-container" :style="{ width: totalWidth + 'px' }">
+            <div
+              v-for="(period, index) in visiblePeriods"
+              :key="index"
+              class="month-header-cell"
+              :style="{ 
+                width: periodWidth + 'px',
+                left: index * periodWidth + 'px',
+                right: 'auto'
+              }"
+            >
+              {{ period.label }}
+              <span class="month-sub" v-if="period.sub">{{ period.sub }}</span>
+            </div>
+          </div>
+        </div>
 
       <!-- Контейнер с прокруткой для блоков -->
       <div 
@@ -119,210 +121,249 @@
         tabindex="0"
       >
         <div class="timeline-container" :style="{ width: totalWidth + 'px' }">
-          <!-- Сетка с блоками -->
-          <div 
-            class="timeline-grid"
-            ref="timelineGrid"
-            :style="{ height: totalHeight + 'px' }"
-          >
-          
-            <!-- Блок -->
-             
-              <div
-                v-for="block in sortedBlocks"
-                :key="block.id"
-                class="block"
-                :class="{ completed: block.completed, editing: block.editing }"
-                :style="{ 
-                    backgroundColor: getBlockBackgroundColor(block),
-                  left: getBlockLeft(block) + 'px',
-                  top: getBlockTop(block) + 'px',
-                  width: periodWidth - 10 + 'px',
-                  minHeight: getBlockMinHeight(block) + 'px'
-                }"
-                @dblclick="editBlock(block)"
-              >
-                <!-- Верхний акцентный градиент -->
-                <div class="block-accent" :style="{ background: getBlockAccentColor(block) }"></div>
-                
-                <!-- Заголовок с приоритетом и статусом -->
-                <div class="block-header">
-                  <div class="block-title-container">
-                    <span class="block-priority" :class="getPriorityClass(block.effort)">
-                      {{ getPriorityIcon(block.effort) }}
-                    </span>
-                    <div class="block-title-wrapper">
-                      <h3 class="block-title">{{ block.title }}</h3>
-                    </div>
-                  </div>
-                  <div class="block-badge" :style="{ background: getEffortColor(block.effort, 0.2) }">
-                    <span class="badge-icon">⚡</span>
-                    <span class="badge-value">{{ block.effort || 0 }}</span>
-                  </div>
-                </div>
+  <!-- Сетка с блоками -->
+  <div 
+    class="timeline-grid"
+    ref="timelineGrid"
+    :style="{ height: totalHeight + 'px' }"
+  >
+    <!-- Вертикальные линии для дней (очень тонкие) -->
+    <template v-if="viewMode === 'horizontal'">
+      <!-- Линии для каждого дня -->
+      <div 
+        v-for="day in 365" 
+        :key="'day-line-'+day"
+        class="horizontal-day-line"
+        :style="{ left: (day - 1) * HORIZONTAL_DAY_WIDTH + 'px' }"
+      ></div>
+      
+      <!-- Линии начала месяца (более заметные) -->
+      <div 
+        v-for="month in 12" 
+        :key="'month-line-'+month"
+        class="horizontal-month-line"
+        :style="{ left: (month - 1) * HORIZONTAL_MONTH_WIDTH + 'px' }"
+      ></div>
+      <!-- Линия конца года (последний день) -->
+      <div 
+        class="horizontal-month-line"
+        :style="{ left: 12 * HORIZONTAL_MONTH_WIDTH + 'px' }"
+      ></div>
+    </template>
 
-                <!-- Описание с иконкой (если есть) -->
-                <div class="block-description" v-if="block.description">
-                   <span class="description-text">{{ block.description }}</span>
-                </div>
-
-              
-              
-                <!-- СПИСОК ЗАДАЧ -->
-               <div class="block-tasks">
-                        <div class="tasks-header">
-                          <span class="tasks-title">📋 Задачи</span>
-                          <button class="add-task-btn" @click.stop="addTask(block)" title="Добавить задачу">+</button>
-                        </div>
-                        
-                        <div 
-                          class="tasks-list" 
-                          v-if="block.tasks && block.tasks.length > 0"
-                          @dragover.prevent
-                          @drop.prevent="onTaskDrop($event, block, null)"
-                        >
-                          <div 
-                            v-for="task in [...block.tasks].sort((a, b) => (a.order || 0) - (b.order || 0))" 
-                            :key="task.id"
-                            class="task-item"
-                            :class="{ 
-                              'task-done': task.status === 'done',
-                              'task-progress': task.status === 'progress',
-                              'drag-over': dragOverBlock?.id === block.id && dragOverTask?.id === task.id,
-                              'dragging': draggedTask?.id === task.id
-                            }"
-                            draggable="true"
-                            @dragstart="onTaskDragStart($event, block, task)"
-                            @dragend="onTaskDragEnd"
-                            @dragover="onTaskDragOver"
-                            @drop="onTaskDrop($event, block, task)"
-                            @dragenter="onTaskDragEnter(block, task)"
-                            @dragleave="onTaskDragLeave"
-                          >
-                            <!-- Статус задачи (кликабельный) -->
-                            <div class="task-status" @click.stop="cycleTaskStatus(block, task, $event)" :title="getStatusTitle(task.status)">
-                              <span class="status-icon" :style="{ color: getStatusColor(task.status) }">
-                                {{ getStatusIcon(task.status) }}
-                              </span>
-                            </div>
-                            
-                            <div class="task-content">
-                              <!-- Режим редактирования (по двойному клику) -->
-                              <div v-if="task.isEditing" class="task-edit-mode">
-                                <input 
-                                  type="text" 
-                                  v-model="task.editValue" 
-                                  @keyup.enter="saveTaskEdit(block, task, $event)"
-                                  @keyup.esc="cancelTaskEdit(task)"
-                                  @blur="saveTaskEdit(block, task, $event)"
-                                  @click.stop
-                                  class="task-edit-input"
-                                  ref="taskInput"
-                                >
-                              </div>
-                              
-                              <!-- Обычный режим (перетаскивание за всю область) -->
-                              <div 
-                                v-else 
-                                class="task-title" 
-                                @dblclick.stop="startTaskEdit(block, task, $event)"
-                              >
-                                {{ task.title }}
-                              </div>
-                            </div>
-                            
-                            <!-- Кнопки действий -->
-                            <div class="task-actions">
-                              <button class="task-edit-btn" @click.stop="startTaskEdit(block, task, $event)" title="Редактировать (двойной клик)">✏️</button>
-                              <button class="task-delete-btn" @click.stop="deleteTask(block, task, $event)" title="Удалить">🗑️</button>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <!-- Пустой список -->
-                        <div 
-                          v-else
-                          class="tasks-empty"
-                          @dragover.prevent
-                          @drop.prevent="onTaskDrop($event, block, null)"
-                        >
-                          <span class="empty-text">Нет задач (перетащите сюда)</span>
-                        </div>
-                      </div>
-              <!-- Прогресс выполнения задач -->
-              <div class="task-progress" v-if="block.tasks && block.tasks.length > 0">
-                <div class="progress-header">
-                  <span class="progress-label">Прогресс этапа</span>
-                  <span class="progress-value">{{ getTaskProgress(block) }}% ({{ getCompletedTasksCount(block) }}/{{ block.tasks.length }})</span>
-                </div>
-                <div class="progress-bar-container">
-                  <div 
-                    class="progress-bar-fill" 
-                    :style="{ 
-                      width: getTaskProgress(block) + '%',
-                      backgroundColor: getProgressColor(getTaskProgress(block))
-                    }"
-                  ></div>
-                </div>
-              </div>
-
-              <!-- Если задач нет, показываем заглушку -->
-              <div class="task-progress empty" v-else>
-                <div class="progress-header">
-                  <span class="progress-label">Прогресс этапа</span>
-                  <span class="progress-value">0%</span>
-                </div>
-                <div class="progress-bar-container">
-                  <div class="progress-bar-fill" style="width: 0%;"></div>
-                </div>
-              </div>
-                <!-- Дата релиза -->
-                <div class="block-release" v-if="!block.editingDate">
-                  <span class="release-icon">🚀</span>
-                  <span class="release-date" @click.stop="startEditingDate(block)">Дата: {{ formatDate(block.releaseDate) }}</span>
-                </div>
-
-                <!-- Редактор даты -->
-                <div class="block-date-editor" v-else>
-                  <input 
-                    type="date" 
-                    v-model="block.editDateValue" 
-                    @change="saveDate(block)"
-                    @blur="cancelDateEdit(block)"
-                    @click.stop
-                  >
-                </div>
-
-                <!-- Прогресс-бар трудозатрат 
-                <div class="effort-progress">
-                  <div 
-                    class="effort-progress-bar" 
-                    :style="{ 
-                      width: getEffortPercent(block.effort) + '%',
-                      background: getEffortColor(block.effort)
-                    }"
-                  ></div>
-                </div> -->
-              </div>
-              </div>
+    <!-- БЛОКИ -->
+    <div
+      v-for="block in sortedBlocks"
+      :key="block.id"
+      class="block"
+      :class="{ completed: block.completed, editing: block.editing }"
+      :style="{ 
+        backgroundColor: getBlockBackgroundColor(block),
+        left: getBlockLeft(block) + 'px',
+        top: getBlockTop(block) + 'px',
+        width: viewMode === 'horizontal' ? HORIZONTAL_MONTH_WIDTH - 10 + 'px' : periodWidth - 10 + 'px',
+        minHeight: getBlockMinHeight(block) + 'px'
+      }"
+    >
+      <!-- Верхний акцентный градиент -->
+      <div class="block-accent" :style="{ background: getBlockAccentColor(block) }"></div>
+      
+      <!-- Заголовок с приоритетом и статусом -->
+      <div class="block-header">
+        <div class="block-title-container">
+          <span class="block-priority" :class="getPriorityClass(block.effort)">
+            {{ getPriorityIcon(block.effort) }}
+          </span>
+          <div class="block-title-wrapper">
+            <h3 class="block-title" @dblclick.stop="editBlock(block)">{{ block.title }}</h3>
+          </div>
         </div>
-         </div>
+        <div class="block-badge" :style="{ background: getEffortColor(block.effort, 0.2) }">
+          <span class="badge-icon">⚡</span>
+          <span class="badge-value">{{ block.effort || 0 }}</span>
+        </div>
+      </div>
+
+      <!-- Описание с иконкой (если есть) -->
+      <div class="block-description" v-if="block.description">
+        <span class="description-text">{{ block.description }}</span>
+      </div>
+
+      <!-- СПИСОК ЗАДАЧ -->
+      <div class="block-tasks">
+        <div class="tasks-header">
+          <span class="tasks-title">📋 Задачи</span>
+          <button class="add-task-btn" @click.stop="addTask(block)" title="Добавить задачу">+</button>
+        </div>
+        
+        <div 
+          class="tasks-list" 
+          v-if="block.tasks && block.tasks.length > 0"
+          @dragover.prevent
+          @drop.prevent="onTaskDrop($event, block, null)"
+        >
+          <div 
+            v-for="task in [...block.tasks].sort((a, b) => (a.order || 0) - (b.order || 0))" 
+            :key="task.id"
+            class="task-item"
+            :class="{ 
+              'task-done': task.status === 'done',
+              'task-progress': task.status === 'progress',
+              'drag-over': dragOverBlock?.id === block.id && dragOverTask?.id === task.id,
+              'dragging': draggedTask?.id === task.id
+            }"
+            draggable="true"
+            @dragstart="onTaskDragStart($event, block, task)"
+            @dragend="onTaskDragEnd"
+            @dragover="onTaskDragOver"
+            @drop="onTaskDrop($event, block, task)"
+            @dragenter="onTaskDragEnter(block, task)"
+            @dragleave="onTaskDragLeave"
+          >
+            <!-- Статус задачи (кликабельный) -->
+            <div class="task-status" @click.stop="cycleTaskStatus(block, task, $event)" :title="getStatusTitle(task.status)">
+              <span class="status-icon" :style="{ color: getStatusColor(task.status) }">
+                {{ getStatusIcon(task.status) }}
+              </span>
+            </div>
+            
+            <div class="task-content">
+              <!-- Режим редактирования (по двойному клику) -->
+              <div v-if="task.isEditing" class="task-edit-mode">
+                <input 
+                  type="text" 
+                  v-model="task.editValue" 
+                  @keyup.enter="saveTaskEdit(block, task, $event)"
+                  @keyup.esc="cancelTaskEdit(task)"
+                  @blur="saveTaskEdit(block, task, $event)"
+                  @click.stop
+                  class="task-edit-input"
+                  ref="taskInput"
+                >
+              </div>
+              
+              <!-- Обычный режим (перетаскивание за всю область) -->
+              <div 
+                v-else 
+                class="task-title" 
+                @dblclick.stop="startTaskEdit(block, task, $event)"
+              >
+                {{ task.title }}
+              </div>
+            </div>
+            
+            <!-- Кнопки действий -->
+            <div class="task-actions">
+              <button class="task-edit-btn" @click.stop="startTaskEdit(block, task, $event)" title="Редактировать (двойной клик)">✏️</button>
+              <button class="task-delete-btn" @click.stop="deleteTask(block, task, $event)" title="Удалить">🗑️</button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Пустой список -->
+        <div 
+          v-else
+          class="tasks-empty"
+          @dragover.prevent
+          @drop.prevent="onTaskDrop($event, block, null)"
+        >
+          <span class="empty-text">Нет задач (перетащите сюда)</span>
+        </div>
+      </div>
+      
+      <!-- Прогресс выполнения задач -->
+      <div class="task-progress" v-if="block.tasks && block.tasks.length > 0">
+        <div class="progress-header">
+          <span class="progress-label">Прогресс этапа</span>
+          <span class="progress-value">{{ getTaskProgress(block) }}% ({{ getCompletedTasksCount(block) }}/{{ block.tasks.length }})</span>
+        </div>
+        <div class="progress-bar-container">
+          <div 
+            class="progress-bar-fill" 
+            :style="{ 
+              width: getTaskProgress(block) + '%',
+              backgroundColor: getProgressColor(getTaskProgress(block))
+            }"
+          ></div>
+        </div>
+      </div>
+
+      <!-- Если задач нет, показываем заглушку -->
+      <div class="task-progress empty" v-else>
+        <div class="progress-header">
+          <span class="progress-label">Прогресс этапа</span>
+          <span class="progress-value">0%</span>
+        </div>
+        <div class="progress-bar-container">
+          <div class="progress-bar-fill" style="width: 0%;"></div>
+        </div>
+      </div>
+    
+      <!-- Дата -->
+      <div class="block-release" v-if="!block.editingDate">
+        <span class="release-icon">📅</span>
+        <span class="release-date" @click.stop="startEditingDate(block)">
+          {{ formatDate(block.releaseDate) }}
+        </span>
+      </div>
+
+      <!-- Редактор даты -->
+      <div class="block-date-editor" v-else>
+        <input 
+          type="date" 
+          v-model="block.editDateValue" 
+          @change="saveDate(block)"
+          @blur="cancelDateEdit(block)"
+          @click.stop
+        >
+      </div>
+      
+      <!-- ===== ЛИНИЯ УДАЛЕНА ИЗ БЛОКА ===== -->
+      
+    </div> <!-- Закрытие блока -->
+
+    <!-- ===== НОВЫЙ СЛОЙ С ЛИНИЯМИ (ПОД БЛОКАМИ) ===== -->
+    <div v-if="viewMode === 'horizontal'" class="lines-layer">
+  <div 
+    v-for="block in sortedBlocks" 
+    :key="'line-'+block.id"
+    class="timeline-line"
+    :data-date="formatDate(block.releaseDate)"
+    :data-block-id="block.id"
+    :data-lastday="isLastDayOfMonth(block.releaseDate)"
+    :style="{ 
+      left: getLinePosition(block) + 'px',
+      top: '-30px',
+      height: (getBlockTop(block) + 10) + 'px' /* линия доходит до блока */
+    }"
+  >
+    <!-- Точка у блока (снизу линии) -->
+    <span class="line-dot"></span>
+    <!-- Метка с датой - ВВЕРХУ линии -->
+    <span class="line-date">{{ formatDate(block.releaseDate) }}</span>
+  </div>
+</div>
+    <!-- ============================================= -->
+
+  </div> <!-- Закрытие timeline-grid -->
+</div> <!-- Закрытие timeline-container -->
+                    </div>
       </div>
               
 
 
-       <!-- Модальное окно редактирования (только информация о релизе) -->
+       <!-- Модальное окно редактирования (только информация о этапе) -->
 <div v-if="showModal" class="modal-overlay" @click="closeModal">
   <div class="modal" @click.stop>
     <div class="modal-header">
-      <h3>✏️ Редактировать релиз</h3>
+      <h3>✏️ Редактировать этап</h3>
       <button class="btn-close" @click="closeModal">✕</button>
     </div>
     
     <!-- Основная информация -->
     <div class="modal-section">
       <div class="form-group">
-        <label>Название релиза</label>
+        <label>Название этапа</label>
         <input v-model="editingBlock.title" type="text" placeholder="Например: Тайм-трекинг">
       </div>
       
@@ -331,7 +372,7 @@
         <textarea 
           v-model="editingBlock.description" 
           rows="3" 
-          placeholder="Краткое описание целей релиза..."
+          placeholder="Краткое описание целей этапа..."
         ></textarea>
       </div>
       
@@ -406,8 +447,14 @@ const MONTH_WIDTH = 320
 const QUARTER_WIDTH = 580
 const BASE_ROW_HEIGHT = 70
 const SCROLL_STEP = 240
+const HORIZONTAL_ROW_HEIGHT = 100 // высота строки месяца
+const HORIZONTAL_COLUMN_WIDTH = 20 // ширина колонки даты
+// Константы для горизонтального режима
+const HORIZONTAL_MONTH_WIDTH = 400 // ширина одного месяца в пикселях (увеличена)
+const HORIZONTAL_DAY_WIDTH = 10 // ширина одного дня (для позиционирования блоков)
 
 const viewMode = ref(localStorage.getItem('roadmap-view-mode') || 'months')
+// Добавляем новый режим: 'months', 'quarters', 'horizontal'
 
 // Все месяцы
 const months = [
@@ -433,18 +480,49 @@ const quarters = [
   { label: 'Q4 2026', sub: 'окт-дек', startMonth: 9, endMonth: 11, type: 'quarter' }
 ]
 
+// Новая переменная для горизонтального режима
+const isHorizontal = computed(() => viewMode.value === 'horizontal')
+
+// Видимые периоды (для горизонтального режима показываем месяцы как строки)
 const visiblePeriods = computed(() => {
-  return viewMode.value === 'months' ? months : quarters
+  if (viewMode.value === 'months') return months
+  if (viewMode.value === 'quarters') return quarters
+  if (viewMode.value === 'horizontal') return months // месяцы как строки
 })
 
+// Ширина периода (для горизонтального режима фиксированная)
 const periodWidth = computed(() => {
-  return viewMode.value === 'months' ? MONTH_WIDTH : QUARTER_WIDTH
+  if (viewMode.value === 'months') return MONTH_WIDTH
+  if (viewMode.value === 'quarters') return QUARTER_WIDTH
+  if (viewMode.value === 'horizontal') return HORIZONTAL_COLUMN_WIDTH
 })
 
 const totalWidth = computed(() => {
+  if (viewMode.value === 'horizontal') {
+    // Ширина = отступ + количество месяцев * ширина месяца
+    return 50 + months.length * HORIZONTAL_MONTH_WIDTH + 50
+  }
   return visiblePeriods.value.length * periodWidth.value + 50
 })
 
+
+// Ширина для блоков (обычная)
+const blocksTotalWidth = computed(() => {
+  if (viewMode.value === 'horizontal') {
+    return months.length * HORIZONTAL_MONTH_WIDTH + 50
+  }
+  return visiblePeriods.value.length * periodWidth.value + 50
+})
+
+// Ширина для шапки (на один день больше)
+const headerTotalWidth = computed(() => {
+  if (viewMode.value === 'horizontal') {
+    // Добавляем ширину одного дня к последнему месяцу
+    const extraDay = HORIZONTAL_MONTH_WIDTH / 30 // ширина одного дня
+    return months.length * HORIZONTAL_MONTH_WIDTH + extraDay + 50
+  }
+  return blocksTotalWidth.value
+})
 // Вычисляем максимальное количество блоков в периоде
 const maxRows = computed(() => {
   const blocksByPeriod = {}
@@ -470,6 +548,10 @@ const maxRows = computed(() => {
 })
 
 const totalHeight = computed(() => {
+  if (isHorizontal.value) {
+    // В горизонтальном режиме высота = количество месяцев * высота строки
+    return months.length * HORIZONTAL_ROW_HEIGHT + 50
+  }
   return maxRows.value * (BASE_ROW_HEIGHT + 20) + 50
 })
 
@@ -479,46 +561,124 @@ const sortedBlocks = computed(() => {
     return new Date(a.releaseDate) - new Date(b.releaseDate)
   })
   
-  // Группируем по периодам (месяцам или кварталам)
-  const blocksByPeriod = {}
-  
-  sorted.forEach(block => {
-    if (!block.releaseDate) return
-    
-    const month = new Date(block.releaseDate).getMonth()
-    let periodKey
-    
-    if (viewMode.value === 'months') {
-      periodKey = month
-    } else {
-      periodKey = Math.floor(month / 3)
-    }
-    
-    if (!blocksByPeriod[periodKey]) blocksByPeriod[periodKey] = []
-    blocksByPeriod[periodKey].push(block)
-  })
-  
-  // Для каждого периода рассчитываем позиции с учетом высоты блоков
-  Object.keys(blocksByPeriod).forEach(periodKey => {
-    const periodBlocks = blocksByPeriod[periodKey]
-    let currentTop = 20 // начальный отступ сверху
-    
-    // Проходим по каждому блоку в периоде
-    periodBlocks.forEach(block => {
-      // Устанавливаем позицию текущего блока
-      block.positionInMonth = currentTop
-      
-      // Рассчитываем высоту блока с учетом задач
-      const blockHeight = calculateBlockHeight(block)
-      
-      // Увеличиваем отступ для следующего блока
-      // ВАЖНО: currentTop += высота_текущего + отступ
-      currentTop += blockHeight + 50
+  // ГОРИЗОНТАЛЬНЫЙ РЕЖИМ
+  if (viewMode.value === 'horizontal') {
+    // Группируем по месяцам
+    const blocksByMonth = {}
+    sorted.forEach(block => {
+      const month = new Date(block.releaseDate).getMonth()
+      if (!blocksByMonth[month]) blocksByMonth[month] = []
+      blocksByMonth[month].push(block)
     })
-  })
+    
+    // Для каждого месяца рассчитываем вертикальные позиции
+    Object.keys(blocksByMonth).forEach(month => {
+      const monthBlocks = blocksByMonth[month]
+      let currentTop = 10 // начальный отступ сверху
+      
+      monthBlocks.forEach(block => {
+        // Устанавливаем позицию текущего блока
+        block.positionInMonth = currentTop
+        // Увеличиваем отступ на высоту блока + отступ между блоками
+        currentTop += calculateBlockHeight(block) + 90
+      })
+    })
+  }
+  
+  // РЕЖИМ ПО МЕСЯЦАМ
+  else if (viewMode.value === 'months') {
+    // Группируем по месяцам
+    const blocksByMonth = {}
+    sorted.forEach(block => {
+      const month = new Date(block.releaseDate).getMonth()
+      if (!blocksByMonth[month]) blocksByMonth[month] = []
+      blocksByMonth[month].push(block)
+    })
+    
+    // Для каждого месяца рассчитываем позиции
+    Object.keys(blocksByMonth).forEach(month => {
+      const monthBlocks = blocksByMonth[month]
+      let currentTop = 10 // начальный отступ сверху
+      
+      monthBlocks.forEach(block => {
+        block.positionInMonth = currentTop
+        currentTop += calculateBlockHeight(block) + 50  
+      })
+    })
+  }
+  
+  // РЕЖИМ ПО КВАРТАЛАМ
+  else if (viewMode.value === 'quarters') {
+    // Группируем по кварталам
+    const blocksByQuarter = {}
+    sorted.forEach(block => {
+      const month = new Date(block.releaseDate).getMonth()
+      const quarter = Math.floor(month / 3)
+      if (!blocksByQuarter[quarter]) blocksByQuarter[quarter] = []
+      blocksByQuarter[quarter].push(block)
+    })
+    
+    // Для каждого квартала рассчитываем позиции
+    Object.keys(blocksByQuarter).forEach(quarter => {
+      const quarterBlocks = blocksByQuarter[quarter]
+      let currentTop = 10 // начальный отступ сверху
+      
+      quarterBlocks.forEach(block => {
+        block.positionInMonth = currentTop
+        currentTop += calculateBlockHeight(block) + 50
+      })
+    })
+  }
   
   return sorted
 })
+
+
+// ==========================================
+// функция для позиционирования в горизонтальном режиме
+// ==========================================
+
+const getBlockLeft = (block) => {
+  if (!block.releaseDate) return 0
+  
+  if (viewMode.value === 'horizontal') {
+    const month = new Date(block.releaseDate).getMonth()
+    return month * HORIZONTAL_MONTH_WIDTH - 10
+  }
+  
+  const releaseMonth = new Date(block.releaseDate).getMonth()
+  let periodIndex
+
+  if (viewMode.value === 'months') {
+  periodIndex = visiblePeriods.value.findIndex(p => p.monthIndex === releaseMonth)
+} else {
+  const quarterIndex = Math.floor(releaseMonth / 3)
+  periodIndex = visiblePeriods.value.findIndex(p => p.startMonth === quarterIndex * 3)
+}
+
+  // Убираем все лишние смещения, оставляем только periodIndex * periodWidth
+  return periodIndex === -1 ? 0 : (periodIndex * periodWidth.value) - 30
+}
+
+
+const getBlockTop = (block) => {
+  if (viewMode.value === 'horizontal') {
+    // В горизонтальном режиме: блоки вертикально друг под другом
+    // Используем positionInMonth, который вычисляется в sortedBlocks
+    return (block.positionInMonth || 0) + 10
+  }
+  return block.positionInMonth || 10
+}
+
+
+// Проверка, является ли день последним в месяце
+const isLastDayOfMonth = (dateStr) => {
+  const date = new Date(dateStr)
+  const month = date.getMonth()
+  const day = date.getDate()
+  const daysInMonth = new Date(2026, month + 1, 0).getDate()
+  return day === daysInMonth
+}
 
 // ==========================================
 // РАСЧЕТ ВЫСОТЫ БЛОКА
@@ -545,7 +705,7 @@ const calculateBlockHeight = (block) => {
   // Прогресс-бар
   height += 50
   
-  // Дата релиза
+  // Дата этапа
   height += 40
   
   return Math.min(height, 700)
@@ -554,7 +714,7 @@ const calculateBlockHeight = (block) => {
 // ОБНОВЛЕННАЯ СТАТИСТИКА
 // ==========================================
 
-// Количество выполненных релизов (все задачи выполнены)
+// Количество выполненных этапов (все задачи выполнены)
 const completedReleasesCount = computed(() => {
   return blocks.value.filter(block => {
     if (!block.tasks || block.tasks.length === 0) return false
@@ -562,7 +722,7 @@ const completedReleasesCount = computed(() => {
   }).length
 })
 
-// Количество релизов в работе (хотя бы одна задача в работе)
+// Количество этапов в работе (хотя бы одна задача в работе)
 const inProgressReleasesCount = computed(() => {
   return blocks.value.filter(block => {
     if (!block.tasks || block.tasks.length === 0) return false
@@ -572,7 +732,7 @@ const inProgressReleasesCount = computed(() => {
   }).length
 })
 
-// Общее количество задач во всех релизах
+// Общее количество задач во всех этапов
 const totalTasksCount = computed(() => {
   return blocks.value.reduce((sum, block) => {
     return sum + (block.tasks?.length || 0)
@@ -652,9 +812,9 @@ const getStageStatus = (block) => {
 
 const getEffortColor = (effort, opacity = 1) => {
   const e = effort || 0
-  if (e < 40) return `rgba(34, 197, 94, ${opacity})`
-  if (e < 80) return `rgba(234, 179, 8, ${opacity})`
-  if (e < 120) return `rgba(249, 115, 22, ${opacity})`
+  if (e < 250) return `rgba(34, 197, 94, ${opacity})`
+  if (e < 400) return `rgba(234, 179, 8, ${opacity})`
+  if (e < 800) return `rgba(249, 115, 22, ${opacity})`
   return `rgba(239, 68, 68, ${opacity})`
 }
 
@@ -1219,57 +1379,32 @@ const cancelDateEdit = (block) => {
   delete block.editDateValue
 }
 
-// ==========================================
-// ПОЗИЦИОНИРОВАНИЕ
-// ==========================================
-const getBlockLeft = (block) => {
-  if (!block.releaseDate) return 0
 
-  const releaseMonth = new Date(block.releaseDate).getMonth()
-  let periodIndex
-
-  if (viewMode.value === 'months') {
-    periodIndex = visiblePeriods.value.findIndex(p => p.monthIndex === releaseMonth)
-  } else {
-    const quarterIndex = Math.floor(releaseMonth / 3)
-    periodIndex = visiblePeriods.value.findIndex(p => p.startMonth === quarterIndex * 3)
-  }
-
-  if (periodIndex === -1) return 0
-  
-  // Левый край блока = левый край колонки + небольшой отступ для красоты
-  return periodIndex * periodWidth.value-10
-}
-
-const getBlockTop = (block) => {
-  return block.positionInMonth || 10
-}
-
-const getBlocksCountInPeriod = (period) => {
-  if (!period) return 0
-  
-  return blocks.value.filter(b => {
-    if (!b.releaseDate) return false
-    const month = new Date(b.releaseDate).getMonth()
-    
-    if (period.type === 'month') {
-      return month === period.monthIndex
-    } else {
-      return month >= period.startMonth && month <= period.endMonth
-    }
-  }).length
-}
 
 // ==========================================
 // НАВИГАЦИЯ И СИНХРОНИЗАЦИЯ ПРОКРУТКИ
 // ==========================================
-
+const horizontalHeader = ref(null)
+// Синхронизация горизонтальной прокрутки
 const syncScroll = () => {
-  if (timelineWrapper.value && monthsHeader.value) {
-    monthsHeader.value.scrollLeft = timelineWrapper.value.scrollLeft
+  if (!timelineWrapper.value) return
+  
+  if (viewMode.value === 'horizontal') {
+    // Для горизонтального режима - синхронизируем horizontalHeader
+    if (horizontalHeader.value) {
+      // Убедимся, что значение прокрутки применяется
+      horizontalHeader.value.scrollLeft = timelineWrapper.value.scrollLeft
+      
+      // Для отладки - можно раскомментировать
+      // console.log('Sync scroll:', timelineWrapper.value.scrollLeft)
+    }
+  } else {
+    // Для месяцев и кварталов - синхронизируем monthsHeader
+    if (monthsHeader.value) {
+      monthsHeader.value.scrollLeft = timelineWrapper.value.scrollLeft
+    }
   }
 }
-
 const isPeriodVisible = (period) => {
   if (!timelineWrapper.value) return false
   
@@ -1361,7 +1496,7 @@ const createNewBlock = async () => {
     const releaseDate = new Date(today.getFullYear(), today.getMonth(), 15).toISOString().split('T')[0]
     
     const newBlock = {
-      title: `Новый релиз`,
+      title: `Новый этап`,
       description: '',
       releaseDate: releaseDate,
       effort: 40,
@@ -1371,20 +1506,20 @@ const createNewBlock = async () => {
     
     const response = await axios.post(`${API_URL}/blocks`, newBlock)
     blocks.value.push(response.data)
-    showNotificationMessage('✅ Релиз создан')
+    showNotificationMessage('✅ Этап создан')
   } catch (error) {
     console.error('Ошибка создания:', error)
   }
 }
 
 const clearAllBlocks = async () => {
-  if (!confirm('Вы уверены, что хотите удалить все релизы?')) return
+  if (!confirm('Вы уверены, что хотите удалить все этапы?')) return
   try {
     for (const block of blocks.value) {
       await axios.delete(`${API_URL}/blocks/${block.id}`)
     }
     blocks.value = []
-    showNotificationMessage('✅ Все релизы удалены')
+    showNotificationMessage('✅ Все этапы удалены')
   } catch (error) {
     console.error('Ошибка при очистке:', error)
   }
@@ -1401,7 +1536,7 @@ const toggleBlockCompletion = async (block, event) => {
     await axios.put(`${API_URL}/blocks/${block.id}`, updatedBlock)
     const index = blocks.value.findIndex(b => b.id === block.id)
     if (index !== -1) blocks.value[index] = updatedBlock
-    showNotificationMessage(updatedBlock.completed ? '✅ Релиз выполнен' : '📋 Релиз возвращён в работу')
+    showNotificationMessage(updatedBlock.completed ? '✅ Этап выполнен' : '📋 Этап возвращён в работу')
   } catch (error) {
     console.error('Ошибка при обновлении статуса:', error)
   }
@@ -1433,7 +1568,7 @@ const saveBlock = async () => {
 }
 
 const deleteBlock = async () => {
-  if (!confirm('Удалить релиз?')) return
+  if (!confirm('Удалить этап?')) return
   try {
     await axios.delete(`${API_URL}/blocks/${editingBlock.value.id}`)
     blocks.value = blocks.value.filter(b => b.id !== editingBlock.value.id)
@@ -1457,14 +1592,22 @@ const setViewMode = (mode) => {
   
   // Сбрасываем прокрутку
   if (timelineWrapper.value) {
-    timelineWrapper.value.scrollTo({ left: 0 })
+    timelineWrapper.value.scrollTo({ left: 0, top: 0 })
   }
+  
+  // Принудительно синхронизируем шапку
+  setTimeout(() => {
+    syncScroll()
+  }, 50)
 }
 
 const formatDate = (dateStr) => {
   if (!dateStr) return ''
   const date = new Date(dateStr)
-  return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
+  const day = date.getDate().toString().padStart(2, '0')
+  const month = (date.getMonth() + 1).toString().padStart(2, '0')
+  const year = date.getFullYear()
+  return `${day}.${month}.${year}`
 }
 
 const showNotificationMessage = (message, type = 'success') => {
@@ -1568,13 +1711,14 @@ const exportAsPNG = async () => {
   try {
     showNotificationMessage('🔄 Подготовка изображения...', 'info')
     
-    // Находим основные элементы
+    // Находим основной контейнер с роадмапом
     const mainContent = document.querySelector('.main-content')
     const timelineWrapper = document.querySelector('.timeline-wrapper')
     const timelineGrid = document.querySelector('.timeline-grid')
     const monthsHeader = document.querySelector('.months-header')
+    const horizontalHeader = ref(null) // Добавить эту строку
     
-    if (!mainContent || !timelineWrapper || !timelineGrid || !monthsHeader) return
+    if (!mainContent || !timelineWrapper || !timelineGrid) return
     
     // Сохраняем исходные стили
     const originalMainHeight = mainContent.style.height
@@ -1587,8 +1731,11 @@ const exportAsPNG = async () => {
     timelineWrapper.style.height = 'auto'
     timelineWrapper.style.overflow = 'visible'
     
+    // Определяем нужную шапку в зависимости от режима
+    const header = viewMode.value === 'horizontal' ? horizontalHeader : monthsHeader
+    
     // Вычисляем полную высоту контента
-    const fullHeight = timelineGrid.scrollHeight + monthsHeader.scrollHeight + 40
+    const fullHeight = timelineGrid.scrollHeight + (header?.scrollHeight || 0) + 40
     
     // Создаем временный контейнер
     const tempContainer = document.createElement('div')
@@ -1600,19 +1747,20 @@ const exportAsPNG = async () => {
     tempContainer.style.top = '-9999px'
     tempContainer.style.zIndex = '-1000'
     
-    // Клонируем шапку месяцев
-    const headerClone = monthsHeader.cloneNode(true)
-    headerClone.style.margin = '0 0 20px 0'
-    headerClone.style.borderBottom = '2px solid #3b82f6'
+    // Клонируем шапку (если есть)
+    if (header) {
+      const headerClone = header.cloneNode(true)
+      headerClone.style.margin = '0 0 20px 0'
+      headerClone.style.borderBottom = '2px solid #3b82f6'
+      tempContainer.appendChild(headerClone)
+    }
     
     // Клонируем сетку с блоками
     const gridClone = timelineGrid.cloneNode(true)
     gridClone.style.height = 'auto'
     gridClone.style.minHeight = fullHeight + 'px'
-    
-    // Добавляем все во временный контейнер
-    tempContainer.appendChild(headerClone)
     tempContainer.appendChild(gridClone)
+    
     document.body.appendChild(tempContainer)
     
     // Даем время на рендер
@@ -1648,13 +1796,16 @@ const exportAsPNG = async () => {
     timelineWrapper.style.overflow = originalWrapperOverflow
     timelineGrid.style.height = originalGridHeight
     
-    // Создаем ссылку для скачивания
+    // Создаем ссылку для скачивания с указанием режима
+    const modeName = viewMode.value === 'horizontal' ? 'horizontal' : 
+                    viewMode.value === 'quarters' ? 'quarters' : 'months'
+    
     const link = document.createElement('a')
-    link.download = `roadmap-${new Date().toISOString().slice(0,10)}.png`
+    link.download = `roadmap-${modeName}-${new Date().toISOString().slice(0,10)}.png`
     link.href = canvas.toDataURL('image/png')
     link.click()
     
-    showNotificationMessage('✅ Изображение сохранено')
+    showNotificationMessage(`✅ Изображение сохранено (${modeName})`)
   } catch (error) {
     console.error('Ошибка при экспорте PNG:', error)
     showNotificationMessage('❌ Ошибка экспорта', 'error')
@@ -1682,8 +1833,9 @@ const exportAsPDF = async () => {
     const timelineWrapper = document.querySelector('.timeline-wrapper')
     const timelineGrid = document.querySelector('.timeline-grid')
     const monthsHeader = document.querySelector('.months-header')
+    const horizontalHeader = document.querySelector('.horizontal-header')
     
-    if (!mainContent || !timelineWrapper || !timelineGrid || !monthsHeader) return
+    if (!mainContent || !timelineWrapper || !timelineGrid) return
     
     // Сохраняем исходные стили
     const originalMainHeight = mainContent.style.height
@@ -1696,8 +1848,11 @@ const exportAsPDF = async () => {
     timelineWrapper.style.height = 'auto'
     timelineWrapper.style.overflow = 'visible'
     
+    // Определяем нужную шапку
+    const header = viewMode.value === 'horizontal' ? horizontalHeader : monthsHeader
+    
     // Вычисляем полную высоту контента
-    const fullHeight = timelineGrid.scrollHeight + monthsHeader.scrollHeight + 40
+    const fullHeight = timelineGrid.scrollHeight + (header?.scrollHeight || 0) + 40
     
     // Создаем временный контейнер
     const tempContainer = document.createElement('div')
@@ -1709,19 +1864,20 @@ const exportAsPDF = async () => {
     tempContainer.style.top = '-9999px'
     tempContainer.style.zIndex = '-1000'
     
-    // Клонируем шапку месяцев
-    const headerClone = monthsHeader.cloneNode(true)
-    headerClone.style.margin = '0 0 20px 0'
-    headerClone.style.borderBottom = '2px solid #3b82f6'
+    // Клонируем шапку (если есть)
+    if (header) {
+      const headerClone = header.cloneNode(true)
+      headerClone.style.margin = '0 0 20px 0'
+      headerClone.style.borderBottom = '2px solid #3b82f6'
+      tempContainer.appendChild(headerClone)
+    }
     
     // Клонируем сетку с блоками
     const gridClone = timelineGrid.cloneNode(true)
     gridClone.style.height = 'auto'
     gridClone.style.minHeight = fullHeight + 'px'
-    
-    // Добавляем все во временный контейнер
-    tempContainer.appendChild(headerClone)
     tempContainer.appendChild(gridClone)
+    
     document.body.appendChild(tempContainer)
     
     // Даем время на рендер
@@ -1753,63 +1909,55 @@ const exportAsPDF = async () => {
     // Создаем PDF формата А4 в альбомной ориентации
     const { jsPDF } = await import('jspdf')
     
-    // АЛЬБОМНАЯ ОРИЕНТАЦИЯ: ширина 297mm, высота 210mm
     const pdf = new jsPDF({
       orientation: 'landscape',
       unit: 'mm',
       format: 'a4'
     })
     
-    // Размеры страницы в альбомной ориентации
     const pageWidth = pdf.internal.pageSize.getWidth() // 297mm
     const pageHeight = pdf.internal.pageSize.getHeight() // 210mm
     
-    // Рассчитываем размер изображения (с отступами)
-    const margin = 10 // отступ 10mm со всех сторон
+    const margin = 10
     const imgWidth = pageWidth - (margin * 2) // 277mm
     const imgHeight = (canvas.height * imgWidth) / canvas.width
     
-    // Проверяем, помещается ли изображение на одну страницу
+    // Добавляем изображение в PDF
     if (imgHeight <= pageHeight - (margin * 2)) {
-      // Всё помещается на одну страницу
       pdf.addImage(imgData, 'PNG', margin, margin, imgWidth, imgHeight)
     } else {
-      // Изображение выше страницы - разбиваем на несколько
       let yPosition = margin
       let remainingHeight = imgHeight
       let pageNum = 1
       
       while (remainingHeight > 0) {
-        // Для первой страницы используем текущую, для следующих создаем новую
         if (pageNum > 1) {
           pdf.addPage()
           yPosition = margin - ((pageNum - 1) * (pageHeight - (margin * 2)))
         }
         
-        pdf.addImage(
-          imgData, 'PNG', 
-          margin, yPosition, 
-          imgWidth, imgHeight, 
-          undefined, 'FAST'
-        )
+        pdf.addImage(imgData, 'PNG', margin, yPosition, imgWidth, imgHeight, undefined, 'FAST')
         
         remainingHeight -= (pageHeight - (margin * 2))
         pageNum++
       }
     }
     
-    // Добавляем информацию о дате создания (внизу справа)
+    // Добавляем информацию о режиме и дате
+    const modeName = viewMode.value === 'horizontal' ? 'Горизонтальный' : 
+                    viewMode.value === 'quarters' ? 'По кварталам' : 'По месяцам'
+    
     pdf.setFontSize(8)
     pdf.setTextColor(100, 100, 100)
     pdf.text(
-      `Роадмап релизов 2026 • ${new Date().toLocaleDateString('ru-RU')}`, 
-      pageWidth - 70, 
+      `Роадмап 2026 • ${modeName} • ${new Date().toLocaleDateString('ru-RU')}`, 
+      pageWidth - 100, 
       pageHeight - 5
     )
     
-    pdf.save(`roadmap-${new Date().toISOString().slice(0,10)}.pdf`)
+    pdf.save(`roadmap-${viewMode.value}-${new Date().toISOString().slice(0,10)}.pdf`)
     
-    showNotificationMessage('✅ PDF (А4, альбомный) сохранен')
+    showNotificationMessage(`✅ PDF сохранен (${modeName})`)
   } catch (error) {
     console.error('Ошибка при экспорте PDF:', error)
     showNotificationMessage('❌ Ошибка экспорта', 'error')
@@ -1827,6 +1975,55 @@ const exportAsPDF = async () => {
     if (timelineGrid) timelineGrid.style.height = ''
   }
 }
+
+
+// Расчет позиции линии по дате (в пикселях от начала месяца)
+const getDatePosition = (block) => {
+  if (!block.releaseDate) return 0
+  
+  const date = new Date(block.releaseDate)
+  const month = date.getMonth()
+  const day = date.getDate()
+  
+  // Получаем количество дней в месяце
+  const daysInMonth = new Date(2026, month + 1, 0).getDate()
+  
+  // Ширина дня с учетом реального количества дней
+  const dayWidth = HORIZONTAL_MONTH_WIDTH / daysInMonth
+  
+  return month * HORIZONTAL_MONTH_WIDTH + (day - 1) * dayWidth + (dayWidth / 2)
+}
+// Расчет позиции линии по дате (в пикселях от левого края)
+const getLinePosition = (block) => {
+  if (!block.releaseDate) return 0
+  
+  const date = new Date(block.releaseDate)
+  const month = date.getMonth()
+  const day = date.getDate()
+  
+  const daysInMonth = new Date(2026, month + 1, 0).getDate()
+  const dayWidth = HORIZONTAL_MONTH_WIDTH / daysInMonth
+  
+  // Просто центр дня, никаких смещений
+  return month * HORIZONTAL_MONTH_WIDTH + (day - 1) * dayWidth + (dayWidth / 2)
+}
+
+//отладочная функция для линии
+const checkLinePositions = () => {
+  console.log('=== ПРОВЕРКА ЛИНИЙ ===')
+  document.querySelectorAll('.block-date-connection').forEach((line, i) => {
+    const rect = line.getBoundingClientRect()
+    const left = line.style.left
+    console.log(`Линия ${i}:`, {
+      left: left,
+      actualX: rect.left,
+      visible: rect.width > 0 && rect.height > 0,
+      parent: line.parentElement?.className
+    })
+  })
+}
+
+
 </script>
 
 <style scoped>
@@ -1991,7 +2188,7 @@ const exportAsPDF = async () => {
 }
 
 /* Специальные цвета для разных метрик */
-.stat-item:nth-child(1) .stat-value { color: #3b82f6; } /* Релизы - синий */
+.stat-item:nth-child(1) .stat-value { color: #3b82f6; } /* Этапы - синий */
 .stat-item:nth-child(2) .stat-value { color: #22c55e; } /* Выполнено - зеленый */
 .stat-item:nth-child(3) .stat-value { color: #eab308; } /* В работе - желтый */
 .stat-item:nth-child(4) .stat-value { color: #64748b; } /* Всего задач - серый */
@@ -2079,6 +2276,7 @@ const exportAsPDF = async () => {
   border-radius: 16px;
   border: 1px solid #e2e8f0;
   overflow: hidden;
+  padding-left: 0px;
 }
 
 /* Шапка периодов */
@@ -2115,7 +2313,7 @@ const exportAsPDF = async () => {
 .timeline-wrapper {
   flex: 1;
   overflow: auto;
-  padding: 16px 12px 16px 16px;
+  padding: 25px 12px 16px 16px;
   position: relative;
   background: #ffffff;
 }
@@ -2138,6 +2336,8 @@ const exportAsPDF = async () => {
 .timeline-container {
   position: relative;
   min-width: min-content;
+  padding-left: 20px;
+  
 }
 
 /* СЕТКА */
@@ -2145,7 +2345,7 @@ const exportAsPDF = async () => {
   background-image: none !important;
   background-color: transparent !important;
   position: relative;
-  
+  z-index: 1;
 }
 
 /* Вертикальные разделители месяцев */
@@ -2160,6 +2360,8 @@ const exportAsPDF = async () => {
   z-index: 5;
   transform: translateX(-1px); /* центрируем по границе */
   box-shadow: 0 0 4px rgba(59, 130, 246, 0.3);
+  
+  
 }
 /* Горизонтальные линии рядов */
 .row-line {
@@ -2203,7 +2405,7 @@ const exportAsPDF = async () => {
   background: white;
   box-shadow: 0 2px 8px rgba(0,0,0,0.02);
   transition: all 0.15s;
-  z-index: 10;
+  z-index: 20;
   min-width: 150px;
   max-height: 600px;
   overflow: auto;
@@ -2212,7 +2414,7 @@ const exportAsPDF = async () => {
   box-sizing: border-box;
   cursor: pointer;
   transform: none; 
-  margin-left: -2px;
+   overflow: visible !important; /* разрешить выход за границы */
 }
 
 .block:hover {
@@ -3187,5 +3389,157 @@ const exportAsPDF = async () => {
 .btn-info:hover {
   background: #475569;
 }
+/* Горизонтальный режим */
+.horizontal-header {
+  flex-shrink: 0;
+  height: 40px;
+  background: white;
+  border-bottom: 2px solid #3b82f6;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  position: relative;
+  padding-left: 20px;
+}
+
+.horizontal-header::-webkit-scrollbar {
+  display: none;
+}
+
+.horizontal-header-container {
+  position: relative;
+  height: 100%;
+  min-width: 100%;
+  padding-left: 20px;
+  
+}
+
+
+/* Вертикальные линии для дней */
+.horizontal-day-line {
+  position: absolute;
+  top: -30px;
+  bottom: 0;
+  width: 1px;
+  background: rgba(203, 213, 225, 0.2);
+  pointer-events: none;
+  z-index: 1;
+  transform: translateX(-17px); /* убираем смещения */
+}
+
+/* Линии начала месяца */
+.horizontal-month-line {
+  position: absolute;
+  top: -30px;
+  bottom: 0;
+  width: 2px;
+  background: rgba(59, 130, 246, 0.4);
+  pointer-events: none;
+  z-index: 2;
+  box-shadow: 0 0 4px rgba(59, 130, 246, 0.3);
+  transform: translateX(-17px);
+}
+
+/* Убираем возможные смещения у ячеек месяцев */
+/* Ячейки месяцев в горизонтальном режиме */
+.horizontal-month-cell {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1e293b;
+  background: white;
+  border-right: 1px solid #e2e8f0;
+  box-sizing: border-box;
+  transform: translateX(0);
+  z-index: 10;
+}
+
+
+/* Слой для линий - под блоками */
+.lines-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* Линия */
+.timeline-line {
+  position: absolute;
+  width: 2px;
+  background: #3b82f6;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+  transform: translateX(-50%);
+}
+
+
+
+/* Для последнего дня месяца - дополнительное смещение влево */
+.timeline-line[data-lastday="true"] {
+  transform: translateX(-50%) translateX(-8px); /* смещение влево */
+}
+
+/* Точка у блока */
+.timeline-line .line-dot {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #3b82f6;
+  opacity: 0.8;
+  transition: all 0.2s;
+}
+
+/* Метка с датой */
+.timeline-line .line-date {
+  position: absolute;
+  bottom: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.7rem;
+  color: white;
+  background: #3b82f6;
+  padding: 4px 8px;
+  border-radius: 16px;
+  white-space: nowrap;
+  opacity: 1;
+  transition: opacity 0.2s, transform 0.2s;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  z-index: 30;
+}
+
+/* Коррекция метки для последнего дня */
+.timeline-line[data-lastday="true"] .line-date {
+  left: auto;
+  right: 0;
+  transform: translateX(0);
+}
+
+/* Для первого дня месяца */
+.timeline-line:first-child .line-date {
+  left: 0;
+  transform: translateX(-50%);
+}
+
+
+/* Для последнего дня при наведении */
+.block:hover ~ .lines-layer .timeline-line[data-lastday="true"][data-block-id] .line-date {
+  transform: translateX(0) translateY(-2px);
+}
+
 
 </style>
