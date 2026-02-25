@@ -8,13 +8,20 @@
 
       <div class="toolbar">
         <div class="toolbar-group">
-          <button 
+           <button 
+            class="btn" 
+            :class="{ active: viewMode === 'horizontal' }" 
+            @click="setViewMode('horizontal')"
+          >
+            📅 По месяцам
+          </button>
+        <!--  <button 
             class="btn" 
             :class="{ active: viewMode === 'months' }" 
             @click="setViewMode('months')"
           >
             📅 По месяцам
-          </button>
+          </button>-->
           <button 
             class="btn" 
             :class="{ active: viewMode === 'quarters' }" 
@@ -22,13 +29,14 @@
           >
             📊 По кварталам
           </button>
-                  <button 
-            class="btn" 
-            :class="{ active: viewMode === 'horizontal' }" 
-            @click="setViewMode('horizontal')"
-          >
-            ↔️ Горизонтально
-  </button>
+          <!-- НОВАЯ КНОПКА ТЕПЛОВОЙ КАРТЫ -->
+            <button 
+              class="btn" 
+              :class="{ active: viewMode === 'heatmap' }" 
+              @click="setViewMode('heatmap')"
+            >
+              🔥 Тепловая карта
+            </button>
         </div>
         <div class="toolbar-group">
           <button class="btn btn-primary" @click="createNewBlock">+ Новый этап</button>
@@ -39,7 +47,7 @@
       </div>
 
       <!-- Статистика сверху -->
-      <div class="statistics-top">
+      <div class="statistics-top" v-if="viewMode !== 'heatmap'">
         <div class="stat-item">
           <span class="stat-icon">📊</span>
           <span class="stat-label">Этапов:</span>
@@ -77,7 +85,7 @@
     <div class="main-content">
 
   <!-- Шапка для горизонтального режима (только месяцы) -->
-        <div v-if="viewMode === 'horizontal'" class="horizontal-header" ref="horizontalHeader">
+        <div v-if="viewMode === 'horizontal'" class="horizontal-header" ref="horizontalHeader" @wheel.prevent>
           <div class="horizontal-header-container" :style="{ width: totalWidth + 'px' }">
                <!-- Месяцы (каждый занимает свою ширину) -->
             <div 
@@ -94,12 +102,12 @@
           </div>
         </div>
       <!-- Шапка месяцев/кварталов -->
-                  <div v-if="viewMode === 'months' || viewMode === 'quarters'" class="months-header" ref="monthsHeader">
-          <div class="months-header-container" :style="{ width: totalWidth + 'px' }">
-            <div
-              v-for="(period, index) in visiblePeriods"
-              :key="index"
-              class="month-header-cell"
+                 <div v-if="viewMode === 'months' || viewMode === 'quarters'" class="months-header" ref="monthsHeader" @wheel.prevent>
+  <div class="months-header-container" :style="{ width: totalWidth + 'px' }">
+    <div
+      v-for="(period, index) in visiblePeriods"
+      :key="index"
+      class="month-header-cell"
               :style="{ 
                 width: periodWidth + 'px',
                 left: index * periodWidth + 'px',
@@ -112,21 +120,105 @@
           </div>
         </div>
 
-      <!-- Контейнер с прокруткой для блоков -->
+    <!-- ТЕПЛОВАЯ КАРТА - БЛОКИ С ЗАДАЧАМИ В ВИДЕ КВАДРАТИКОВ -->
+<div v-if="viewMode === 'heatmap'" class="heatmap-view">
+  <div class="heatmap-header">
+    <div class="heatmap-title-section">
+      <h2>🔥 Тепловая карта трудозатрат</h2>
+      <div class="heatmap-legend">
+        <div class="legend-item">
+          <span class="legend-color" :style="{ background: getEffortColor(50, 1) }"></span>
+          <span>50 ч</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-color" :style="{ background: getEffortColor(250, 1) }"></span>
+          <span>250 ч</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-color" :style="{ background: getEffortColor(500, 1) }"></span>
+          <span>500 ч</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-color" :style="{ background: getEffortColor(800, 1) }"></span>
+          <span>800+ ч</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="heatmap-stats">
+      <div class="heatmap-stat">
+        <span class="stat-icon">📊</span>
+        <span class="stat-label">Этапов:</span>
+        <span class="stat-value">{{ blocks.length }}</span>
+      </div>
+      <div class="heatmap-stat">
+        <span class="stat-icon">⚡</span>
+        <span class="stat-label">Всего трудозатрат:</span>
+        <span class="stat-value">{{ totalEffort }} ч</span>
+      </div>
+      <div class="heatmap-stat">
+        <span class="stat-icon">✅</span>
+        <span class="stat-label">Выполнено:</span>
+        <span class="stat-value">{{ completedEffort }} ч ({{ completedEffortPercent }}%)</span>
+      </div>
+    </div>
+  </div>
+  
+  <div class="heatmap-container">
+    <!-- СЕТКА для блоков -->
+    <div class="heatmap-grid">
       <div 
-        class="timeline-wrapper" 
-        ref="timelineWrapper"
-        @wheel="onWheel"
-        @scroll="syncScroll"
-        tabindex="0"
+        v-for="block in sortedByEffort" 
+        :key="block.id"
+        class="heatmap-block"
+        :style="getBlockGridStyle(block)"
+        @click="editBlock(block)"
+        :title="`${block.title}: ${block.effort || 0} ч`"
       >
-        <div class="timeline-container" :style="{ width: totalWidth + 'px' }">
+        <!-- Название этапа и трудозатраты -->
+        <div class="heatmap-block-header">
+          <div class="heatmap-block-title">{{ block.title }}</div>
+          <div class="heatmap-block-effort">{{ block.effort || 0 }} ч</div>
+        </div>
+        
+        <!-- Задачи в виде квадратиков -->
+        <div class="heatmap-tasks-grid">
+          <div 
+            v-for="task in block.tasks" 
+            :key="task.id"
+            class="heatmap-task-square"
+            :style="{ backgroundColor: getTaskColor(task) }"
+            :title="`${task.title} - ${task.effort || 0}ч`"
+          ></div>
+          <div v-if="!block.tasks?.length" class="heatmap-no-tasks">
+            <span>⚪</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+      <!-- Контейнер с прокруткой для блоков -->
+     <div 
+ v-if="viewMode !== 'heatmap'"
+    class="timeline-wrapper" 
+    ref="timelineWrapper"
+    @wheel="onWheel"
+    @scroll="syncScroll"
+    tabindex="0"
+>
+  <div class="timeline-container" :style="{ width: totalWidth + 'px' }">
   <!-- Сетка с блоками -->
-  <div 
-    class="timeline-grid"
-    ref="timelineGrid"
-    :style="{ height: totalHeight + 'px' }"
-  >
+          <div 
+          class="timeline-grid"
+              ref="timelineGrid"
+              :style="{ height: totalHeight + 'px' }"
+              @dragover="onGridDragOver"
+              @dragleave="removePositionIndicator"
+              @drop="onGridDrop"
+          >
     <!-- Вертикальные линии для дней (очень тонкие) -->
     <template v-if="viewMode === 'horizontal'">
       <!-- Линии для каждого дня -->
@@ -152,37 +244,47 @@
     </template>
 
     <!-- БЛОКИ -->
-    <div
-      v-for="block in sortedBlocks"
-      :key="block.id"
-      class="block"
-      :class="{ completed: block.completed, editing: block.editing }"
-      :style="{ 
-        backgroundColor: getBlockBackgroundColor(block),
-        left: getBlockLeft(block) + 'px',
-        top: getBlockTop(block) + 'px',
-        width: viewMode === 'horizontal' ? HORIZONTAL_MONTH_WIDTH - 10 + 'px' : periodWidth - 10 + 'px',
-        minHeight: getBlockMinHeight(block) + 'px'
-      }"
-    >
+              <div
+              v-for="block in sortedBlocks"
+              :key="block.id"
+              class="block"
+              :data-block-id="block.id"
+              :class="{ 
+                completed: block.completed, 
+                editing: block.editing,
+                'block-dragging': isDraggingLine && draggedBlockId === block.id
+              }"
+              :style="{ 
+                backgroundColor: getBlockBackgroundColor(block),
+                left: (isDraggingLine && draggedBlockId === block.id) ? blockDragCurrentX + 'px' : getBlockLeft(block) + 'px',
+                top: getBlockTop(block) + 'px',
+                width: viewMode === 'horizontal' ? HORIZONTAL_MONTH_WIDTH - 10 + 'px' : periodWidth - 10 + 'px',
+                minHeight: getBlockMinHeight(block) + 'px'
+              }"
+            >
       <!-- Верхний акцентный градиент -->
       <div class="block-accent" :style="{ background: getBlockAccentColor(block) }"></div>
       
       <!-- Заголовок с приоритетом и статусом -->
-      <div class="block-header">
-        <div class="block-title-container">
-          <span class="block-priority" :class="getPriorityClass(block.effort)">
-            {{ getPriorityIcon(block.effort) }}
-          </span>
-          <div class="block-title-wrapper">
-            <h3 class="block-title" @dblclick.stop="editBlock(block)">{{ block.title }}</h3>
+            <div 
+          class="block-header"
+          draggable="true"
+          @dragstart="onBlockHeaderDragStart($event, block)"
+          @dragend="onBlockHeaderDragEnd"
+        >
+          <div class="block-title-container">
+            <span class="block-priority" :class="getPriorityClass(block.effort)">
+              {{ getPriorityIcon(block.effort) }}
+            </span>
+            <div class="block-title-wrapper">
+              <h3 class="block-title" @click.stop="editBlock(block)">{{ block.title }}</h3>
+            </div>
+          </div>
+          <div class="block-badge" :style="{ background: getEffortColor(block.effort, 0.2) }">
+            <span class="badge-icon">⚡</span>
+            <span class="badge-value">{{ block.effort || 0 }}</span>
           </div>
         </div>
-        <div class="block-badge" :style="{ background: getEffortColor(block.effort, 0.2) }">
-          <span class="badge-icon">⚡</span>
-          <span class="badge-value">{{ block.effort || 0 }}</span>
-        </div>
-      </div>
 
       <!-- Описание с иконкой (если есть) -->
       <div class="block-description" v-if="block.description">
@@ -228,25 +330,25 @@
             </div>
             
             <div class="task-content">
-              <!-- Режим редактирования (по двойному клику) -->
               <div v-if="task.isEditing" class="task-edit-mode">
-                <input 
-                  type="text" 
-                  v-model="task.editValue" 
-                  @keyup.enter="saveTaskEdit(block, task, $event)"
-                  @keyup.esc="cancelTaskEdit(task)"
-                  @blur="saveTaskEdit(block, task, $event)"
-                  @click.stop
-                  class="task-edit-input"
-                  ref="taskInput"
-                >
-              </div>
+              <input 
+                type="text" 
+                v-model="task.editValue" 
+                @keyup.enter="saveTaskEdit(block, task, $event)"
+                @keyup.esc="cancelTaskEdit(task)"
+                @blur="saveTaskEdit(block, task, $event)"
+                @click.stop
+                class="task-edit-input"
+                ref="taskInput"
+                autofocus 
+              >
+            </div>
               
               <!-- Обычный режим (перетаскивание за всю область) -->
               <div 
                 v-else 
                 class="task-title" 
-                @dblclick.stop="startTaskEdit(block, task, $event)"
+                @click.stop="startTaskEdit(block, task, $event)"
               >
                 {{ task.title }}
               </div>
@@ -318,29 +420,41 @@
         >
       </div>
       
-      <!-- ===== ЛИНИЯ УДАЛЕНА ИЗ БЛОКА ===== -->
-      
+     
     </div> <!-- Закрытие блока -->
 
-    <!-- ===== НОВЫЙ СЛОЙ С ЛИНИЯМИ (ПОД БЛОКАМИ) ===== -->
-    <div v-if="viewMode === 'horizontal'" class="lines-layer">
+   <!-- ===== НОВЫЙ СЛОЙ С ЛИНИЯМИ (ПОД БЛОКАМИ) ===== -->
+        <div v-if="viewMode === 'horizontal'" class="lines-layer">
   <div 
     v-for="block in sortedBlocks" 
     :key="'line-'+block.id"
     class="timeline-line"
+    :class="{ 'line-dragging-active': isDraggingLine && draggedLineBlock?.id === block.id }"
     :data-date="formatDate(block.releaseDate)"
     :data-block-id="block.id"
     :data-lastday="isLastDayOfMonth(block.releaseDate)"
     :style="{ 
-      left: getLinePosition(block) + 'px',
+      left: (isDraggingLine && draggedLineBlock?.id === block.id) ? dragCurrentX + 'px' : getLinePosition(block) + 'px',
       top: '-30px',
-      height: (getBlockTop(block) + 10) + 'px' /* линия доходит до блока */
+      height: (getBlockTop(block) + 10) + 'px'
     }"
+    draggable="true"
+    @dragstart="onLineDragStart($event, block)"
+    @dragend="onLineDragEnd"
   >
     <!-- Точка у блока (снизу линии) -->
     <span class="line-dot"></span>
-    <!-- Метка с датой - ВВЕРХУ линии -->
-    <span class="line-date">{{ formatDate(block.releaseDate) }}</span>
+    
+     <!-- Метка с датой - СДЕЛАЕМ ПЕРЕТАСКИВАЕМОЙ -->
+    <span 
+      class="line-date"
+      :class="{ 'line-date-dragging': isDraggingLine && draggedLineBlock?.id === block.id }"
+      draggable="true"
+      @dragstart="onLineDragStart($event, block)"
+      @dragend="onLineDragEnd"
+    >
+      {{ (isDraggingLine && draggedLineBlock?.id === block.id) ? previewDate : formatDate(block.releaseDate) }}
+    </span>
   </div>
 </div>
     <!-- ============================================= -->
@@ -349,7 +463,6 @@
 </div> <!-- Закрытие timeline-container -->
                     </div>
       </div>
-              
 
 
        <!-- Модальное окно редактирования (только информация о этапе) -->
@@ -452,8 +565,14 @@ const HORIZONTAL_COLUMN_WIDTH = 20 // ширина колонки даты
 // Константы для горизонтального режима
 const HORIZONTAL_MONTH_WIDTH = 400 // ширина одного месяца в пикселях (увеличена)
 const HORIZONTAL_DAY_WIDTH = 10 // ширина одного дня (для позиционирования блоков)
-
-const viewMode = ref(localStorage.getItem('roadmap-view-mode') || 'months')
+// Состояние для перетаскивания линии
+const draggedLineBlock = ref(null)
+const isDraggingLine = ref(false)
+const dragStartX = ref(0) // Начальная позиция
+const dragCurrentX = ref(0) // Текущая позиция
+const dragOffset = ref(0) // Смещение
+const previewDate = ref('') // Дата для предпросмотра
+const viewMode = ref(localStorage.getItem('roadmap-view-mode') || 'horizontal')
 // Добавляем новый режим: 'months', 'quarters', 'horizontal'
 
 // Все месяцы
@@ -488,13 +607,15 @@ const visiblePeriods = computed(() => {
   if (viewMode.value === 'months') return months
   if (viewMode.value === 'quarters') return quarters
   if (viewMode.value === 'horizontal') return months // месяцы как строки
+   if (viewMode.value === 'heatmap') return [] // для тепловой карты периоды не нужны
 })
 
 // Ширина периода (для горизонтального режима фиксированная)
 const periodWidth = computed(() => {
-  if (viewMode.value === 'months') return MONTH_WIDTH
-  if (viewMode.value === 'quarters') return QUARTER_WIDTH
+    if (viewMode.value === 'months') return MONTH_WIDTH
+  if (viewMode.value === 'quarters') return QUARTER_WIDTH  // ← это должно быть
   if (viewMode.value === 'horizontal') return HORIZONTAL_COLUMN_WIDTH
+  return 0
 })
 
 const totalWidth = computed(() => {
@@ -502,7 +623,7 @@ const totalWidth = computed(() => {
     // Ширина = отступ + количество месяцев * ширина месяца
     return 50 + months.length * HORIZONTAL_MONTH_WIDTH + 50
   }
-  return visiblePeriods.value.length * periodWidth.value + 50
+  return visiblePeriods.length * periodWidth.value + 50
 })
 
 
@@ -511,7 +632,7 @@ const blocksTotalWidth = computed(() => {
   if (viewMode.value === 'horizontal') {
     return months.length * HORIZONTAL_MONTH_WIDTH + 50
   }
-  return visiblePeriods.value.length * periodWidth.value + 50
+  return visiblePeriods.length * periodWidth.value + 50
 })
 
 // Ширина для шапки (на один день больше)
@@ -523,6 +644,8 @@ const headerTotalWidth = computed(() => {
   }
   return blocksTotalWidth.value
 })
+
+
 // Вычисляем максимальное количество блоков в периоде
 const maxRows = computed(() => {
   const blocksByPeriod = {}
@@ -757,10 +880,30 @@ const overallProgress = computed(() => {
 
 // Цитаты
 const quotes = [
-  "🚀 Планируй и достигай",
-  "⚡ Каждый день важен",
-  "🎯 Фокус на главном",
-  "💡 Маленькие шаги = большие результаты"
+   "🚀 Мечты не работают, пока не работаешь ты",
+  "⚡ Каждый день — это шанс стать ближе к цели",
+  "🎯 Фокус на главном — ключ к результату",
+  "💡 Маленькие шаги каждый день приводят к большим результатам",
+  "🌟 Будущее зависит от того, что ты делаешь сегодня",
+  "📈 Прогресс — это движение, даже если оно медленное",
+  "⏰ Лучшее время начать — сейчас",
+  "💪 Ты можешь больше, чем думаешь",
+  "🎯 Цели без плана — просто мечты",
+  "✨ Верь в процесс, даже когда не видишь результата",
+  "📊 Каждая выполненная задача приближает к успеху",
+  "⚡ Энергия и настойчивость побеждают всё",
+  "🌅 Утро начинается не с кофе, а с плана на день",
+  "🏆 Успех — это сумма маленьких усилий, повторяющихся день за днём",
+  "🔄 Не бойся менять планы, бойся оставаться без цели",
+  "📝 Записывай идеи — они материальны",
+  "🎯 Чем яснее цель, тем быстрее путь",
+  "💫 Делай сегодня то, что другие не хотят, завтра будешь жить так, как другие не могут",
+  "🌟 Звёзды видны тем, кто идёт в темноте",
+  "🚀 Не жди идеального момента, создавай его",
+  "💎 Каждый день — это новая возможность",
+  "🌈 Даже самая длинная дорога начинается с первого шага",
+  "⚡ Твой потенциал безграничен, просто начни",
+  "🎯 Визуализируй цель и иди к ней"
 ]
 const currentQuote = ref(quotes[0])
 const quoteElement = ref(null)
@@ -1001,7 +1144,7 @@ const taskInput = ref(null)
 const startTaskEdit = (block, task, event) => {
   event.stopPropagation()
   
-  // Убеждаемся, что другие задачи не в режиме редактирования
+  // Закрываем редактирование у всех других задач
   block.tasks.forEach(t => {
     if (t.id !== task.id) {
       t.isEditing = false
@@ -1012,11 +1155,13 @@ const startTaskEdit = (block, task, event) => {
   task.isEditing = true
   task.editValue = task.title
   
-  // Фокус на инпуте после рендера
+  // Фокус и выделение текста
   setTimeout(() => {
     const inputs = document.querySelectorAll('.task-edit-input')
     if (inputs.length > 0) {
-      inputs[inputs.length - 1].focus()
+      const input = inputs[inputs.length - 1]
+      input.focus()
+      input.select() // Выделяем текст для быстрой замены
     }
   }, 50)
 }
@@ -1412,7 +1557,7 @@ const isPeriodVisible = (period) => {
   const scrollLeft = wrapper.scrollLeft
   const wrapperWidth = wrapper.clientWidth
   
-  const periodIndex = visiblePeriods.value.findIndex(p => 
+  const periodIndex = visiblePeriods.findIndex(p => 
     p.type === period.type && 
     (p.monthIndex === period.monthIndex || p.startMonth === period.startMonth)
   )
@@ -1426,7 +1571,7 @@ const isPeriodVisible = (period) => {
 const scrollToPeriod = (period) => {
   if (!timelineWrapper.value) return
   
-  const periodIndex = visiblePeriods.value.findIndex(p => 
+  const periodIndex = visiblePeriods.findIndex(p => 
     p.type === period.type && 
     (p.monthIndex === period.monthIndex || p.startMonth === period.startMonth)
   )
@@ -1580,15 +1725,21 @@ const deleteBlock = async () => {
 }
 
 const setViewMode = (mode) => {
+  // Проверяем, что режим допустим
+  const validModes = ['horizontal', 'quarters', 'heatmap']
+  if (!validModes.includes(mode)) return
+  
   viewMode.value = mode
   localStorage.setItem('roadmap-view-mode', mode)
   
-  // Сбрасываем позиции блоков
-  blocks.value = blocks.value.map(block => {
-    const newBlock = { ...block }
-    delete newBlock.positionInMonth
-    return newBlock
-  })
+  // Сбрасываем позиции блоков только для режимов с временной шкалой
+  if (mode !== 'heatmap') {
+    blocks.value = blocks.value.map(block => {
+      const newBlock = { ...block }
+      delete newBlock.positionInMonth
+      return newBlock
+    })
+  }
   
   // Сбрасываем прокрутку
   if (timelineWrapper.value) {
@@ -1715,8 +1866,8 @@ const exportAsPNG = async () => {
     const mainContent = document.querySelector('.main-content')
     const timelineWrapper = document.querySelector('.timeline-wrapper')
     const timelineGrid = document.querySelector('.timeline-grid')
-    const monthsHeader = document.querySelector('.months-header')
-    const horizontalHeader = ref(null) // Добавить эту строку
+    const monthsHeaderElement = document.querySelector('.months-header')
+    const horizontalHeaderElement = document.querySelector('.horizontal-header')
     
     if (!mainContent || !timelineWrapper || !timelineGrid) return
     
@@ -1732,7 +1883,7 @@ const exportAsPNG = async () => {
     timelineWrapper.style.overflow = 'visible'
     
     // Определяем нужную шапку в зависимости от режима
-    const header = viewMode.value === 'horizontal' ? horizontalHeader : monthsHeader
+    const header = viewMode.value === 'horizontal' ? horizontalHeaderElement : monthsHeaderElement
     
     // Вычисляем полную высоту контента
     const fullHeight = timelineGrid.scrollHeight + (header?.scrollHeight || 0) + 40
@@ -1752,6 +1903,15 @@ const exportAsPNG = async () => {
       const headerClone = header.cloneNode(true)
       headerClone.style.margin = '0 0 20px 0'
       headerClone.style.borderBottom = '2px solid #3b82f6'
+      headerClone.style.pointerEvents = 'auto' // Сбрасываем pointer-events для клона
+      headerClone.style.overflow = 'visible' // Показываем всю шапку
+      
+      // Для горизонтальной шапки убираем лишние ограничения
+      if (viewMode.value === 'horizontal') {
+        headerClone.style.pointerEvents = 'auto'
+        headerClone.style.height = '50px' // Фиксируем высоту
+      }
+      
       tempContainer.appendChild(headerClone)
     }
     
@@ -1759,6 +1919,13 @@ const exportAsPNG = async () => {
     const gridClone = timelineGrid.cloneNode(true)
     gridClone.style.height = 'auto'
     gridClone.style.minHeight = fullHeight + 'px'
+    gridClone.style.overflow = 'visible'
+    
+    // Убираем классы перетаскивания у клона
+    gridClone.querySelectorAll('.line-dragging-active, .block-dragging, .block-header-dragging').forEach(el => {
+      el.classList.remove('line-dragging-active', 'block-dragging', 'block-header-dragging')
+    })
+    
     tempContainer.appendChild(gridClone)
     
     document.body.appendChild(tempContainer)
@@ -1777,13 +1944,21 @@ const exportAsPNG = async () => {
       windowHeight: tempContainer.scrollHeight,
       onclone: (clonedDoc) => {
         // Убираем скроллы в клоне
-        const clonedElements = clonedDoc.querySelectorAll('.timeline-wrapper, .main-content')
+        const clonedElements = clonedDoc.querySelectorAll('.timeline-wrapper, .main-content, .horizontal-header, .months-header')
         clonedElements.forEach(el => {
           if (el) {
             el.style.overflow = 'visible'
             el.style.height = 'auto'
+            el.style.pointerEvents = 'auto'
           }
         })
+        
+        // Для горизонтальной шапки убираем pointer-events: none
+        const clonedHeader = clonedDoc.querySelector('.horizontal-header')
+        if (clonedHeader) {
+          clonedHeader.style.pointerEvents = 'auto'
+          clonedHeader.style.overflow = 'visible'
+        }
       }
     })
     
@@ -1796,7 +1971,7 @@ const exportAsPNG = async () => {
     timelineWrapper.style.overflow = originalWrapperOverflow
     timelineGrid.style.height = originalGridHeight
     
-    // Создаем ссылку для скачивания с указанием режима
+    // Создаем ссылку для скачивания
     const modeName = viewMode.value === 'horizontal' ? 'horizontal' : 
                     viewMode.value === 'quarters' ? 'quarters' : 'months'
     
@@ -1823,7 +1998,6 @@ const exportAsPNG = async () => {
     if (timelineGrid) timelineGrid.style.height = ''
   }
 }
-
 const exportAsPDF = async () => {
   try {
     showNotificationMessage('🔄 Подготовка PDF (А4, альбомная)...', 'info')
@@ -1832,8 +2006,8 @@ const exportAsPDF = async () => {
     const mainContent = document.querySelector('.main-content')
     const timelineWrapper = document.querySelector('.timeline-wrapper')
     const timelineGrid = document.querySelector('.timeline-grid')
-    const monthsHeader = document.querySelector('.months-header')
-    const horizontalHeader = document.querySelector('.horizontal-header')
+    const monthsHeaderElement = document.querySelector('.months-header')
+    const horizontalHeaderElement = document.querySelector('.horizontal-header')
     
     if (!mainContent || !timelineWrapper || !timelineGrid) return
     
@@ -1849,7 +2023,7 @@ const exportAsPDF = async () => {
     timelineWrapper.style.overflow = 'visible'
     
     // Определяем нужную шапку
-    const header = viewMode.value === 'horizontal' ? horizontalHeader : monthsHeader
+    const header = viewMode.value === 'horizontal' ? horizontalHeaderElement : monthsHeaderElement
     
     // Вычисляем полную высоту контента
     const fullHeight = timelineGrid.scrollHeight + (header?.scrollHeight || 0) + 40
@@ -1869,6 +2043,14 @@ const exportAsPDF = async () => {
       const headerClone = header.cloneNode(true)
       headerClone.style.margin = '0 0 20px 0'
       headerClone.style.borderBottom = '2px solid #3b82f6'
+      headerClone.style.pointerEvents = 'auto'
+      headerClone.style.overflow = 'visible'
+      
+      if (viewMode.value === 'horizontal') {
+        headerClone.style.pointerEvents = 'auto'
+        headerClone.style.height = '50px'
+      }
+      
       tempContainer.appendChild(headerClone)
     }
     
@@ -1876,6 +2058,13 @@ const exportAsPDF = async () => {
     const gridClone = timelineGrid.cloneNode(true)
     gridClone.style.height = 'auto'
     gridClone.style.minHeight = fullHeight + 'px'
+    gridClone.style.overflow = 'visible'
+    
+    // Убираем классы перетаскивания
+    gridClone.querySelectorAll('.line-dragging-active, .block-dragging, .block-header-dragging').forEach(el => {
+      el.classList.remove('line-dragging-active', 'block-dragging', 'block-header-dragging')
+    })
+    
     tempContainer.appendChild(gridClone)
     
     document.body.appendChild(tempContainer)
@@ -1906,7 +2095,7 @@ const exportAsPDF = async () => {
     // Получаем изображение
     const imgData = canvas.toDataURL('image/png')
     
-    // Создаем PDF формата А4 в альбомной ориентации
+    // Создаем PDF
     const { jsPDF } = await import('jspdf')
     
     const pdf = new jsPDF({
@@ -1915,11 +2104,11 @@ const exportAsPDF = async () => {
       format: 'a4'
     })
     
-    const pageWidth = pdf.internal.pageSize.getWidth() // 297mm
-    const pageHeight = pdf.internal.pageSize.getHeight() // 210mm
+    const pageWidth = pdf.internal.pageSize.getWidth()
+    const pageHeight = pdf.internal.pageSize.getHeight()
     
     const margin = 10
-    const imgWidth = pageWidth - (margin * 2) // 277mm
+    const imgWidth = pageWidth - (margin * 2)
     const imgHeight = (canvas.height * imgWidth) / canvas.width
     
     // Добавляем изображение в PDF
@@ -1943,7 +2132,7 @@ const exportAsPDF = async () => {
       }
     }
     
-    // Добавляем информацию о режиме и дате
+    // Добавляем информацию о режиме
     const modeName = viewMode.value === 'horizontal' ? 'Горизонтальный' : 
                     viewMode.value === 'quarters' ? 'По кварталам' : 'По месяцам'
     
@@ -1962,7 +2151,7 @@ const exportAsPDF = async () => {
     console.error('Ошибка при экспорте PDF:', error)
     showNotificationMessage('❌ Ошибка экспорта', 'error')
     
-    // Восстанавливаем стили в случае ошибки
+    // Восстанавливаем стили
     const mainContent = document.querySelector('.main-content')
     const timelineWrapper = document.querySelector('.timeline-wrapper')
     const timelineGrid = document.querySelector('.timeline-grid')
@@ -2024,6 +2213,624 @@ const checkLinePositions = () => {
 }
 
 
+// Начало перетаскивания линии
+
+// Начало перетаскивания линии
+const onLineDragStart = (event, block) => {
+  event.stopPropagation()
+  
+  console.log('🚀 Начало перетаскивания линии для блока:', block.title)
+  
+  // Сохраняем блок, который перетаскиваем
+  draggedLineBlock.value = block
+  draggedBlockId.value = block.id
+  isDraggingLine.value = true
+  
+  // Получаем текущую позицию линии
+  const currentLeft = getLinePosition(block)
+  
+  // Запоминаем позиции
+  dragStartX.value = currentLeft
+  dragCurrentX.value = currentLeft
+  blockOriginalLeft.value = getBlockLeft(block)
+  blockDragCurrentX.value = getBlockLeft(block)
+  
+  // Устанавливаем данные для перетаскивания
+  event.dataTransfer.setData('text/plain', JSON.stringify({
+    blockId: block.id,
+    type: 'line'
+  }))
+  event.dataTransfer.effectAllowed = 'move'
+  
+  // Скрываем стандартное изображение
+  const canvas = document.createElement('canvas')
+  canvas.width = 1
+  canvas.height = 1
+  event.dataTransfer.setDragImage(canvas, 0, 0)
+  
+  // Добавляем классы
+  event.target.classList.add('line-dragging')
+  
+  // Показываем подсказку с текущей датой
+  previewDate.value = formatDate(block.releaseDate)
+  document.body.classList.add('is-dragging')
+}
+
+// Окончание перетаскивания
+
+// Окончание перетаскивания
+const onLineDragEnd = async (event) => {
+  // Если есть новое положение, применяем его
+  if (isDraggingLine.value && draggedLineBlock.value && previewDate.value) {
+    try {
+      // Конвертируем previewDate обратно в формат YYYY-MM-DD
+      const [day, month, year] = previewDate.value.split('.')
+      const newDate = `${year}-${month}-${day}`
+      
+      // Обновляем дату блока
+      await updateBlockDate(draggedLineBlock.value, newDate)
+      
+      showNotificationMessage(`📅 Дата изменена на ${previewDate.value}`)
+    } catch (error) {
+      console.error('Ошибка при обновлении даты:', error)
+      showNotificationMessage('❌ Ошибка при изменении даты', 'error')
+    }
+  }
+  
+  // Убираем классы и восстанавливаем transitions
+  document.querySelectorAll('.line-dragging, .line-dragging-active, .block-dragging').forEach(el => {
+    el.classList.remove('line-dragging', 'line-dragging-active', 'block-dragging')
+    el.style.transition = ''
+    el.style.left = ''
+  })
+  
+  // Сбрасываем состояние
+  draggedLineBlock.value = null
+  draggedBlockId.value = null
+  isDraggingLine.value = false
+  isDraggingHeader.value = false
+  draggingBlockHeader.value = null
+  dragStartX.value = 0
+  dragCurrentX.value = 0
+  blockDragCurrentX.value = 0
+  previewDate.value = ''
+  removePositionIndicator()
+  document.body.classList.remove('is-dragging')
+}
+
+// перетаскивания блока
+const draggedBlockId = ref(null)
+const blockDragCurrentX = ref(0)
+const blockOriginalLeft = ref(0)
+
+// Конвертация позиции в пикселях в дату (улучшенная версия)
+const positionToDate = (x) => {
+  const container = document.querySelector('.timeline-container')
+  const containerLeft = container ? container.offsetLeft : 20
+  const adjustedX = x - containerLeft - 20
+  
+  if (adjustedX < 0) return null
+  
+  // Определяем месяц с учетом ширины
+  const monthIndex = Math.floor(adjustedX / HORIZONTAL_MONTH_WIDTH)
+  if (monthIndex < 0 || monthIndex >= 12) return null
+  
+  // Определяем день
+  const monthStartX = monthIndex * HORIZONTAL_MONTH_WIDTH
+  const dayOffset = adjustedX - monthStartX
+  const daysInMonth = new Date(2026, monthIndex + 1, 0).getDate()
+  const dayWidth = HORIZONTAL_MONTH_WIDTH / daysInMonth
+  
+  // Более точное вычисление дня
+  let day = Math.floor(dayOffset / dayWidth) + 1
+  day = Math.max(1, Math.min(day, daysInMonth))
+  
+  // Корректировка для границ
+  if (dayOffset < dayWidth * 0.3) day = 1
+  if (dayOffset > HORIZONTAL_MONTH_WIDTH - dayWidth * 0.3) day = daysInMonth
+  
+  const date = new Date(2026, monthIndex, day)
+  const year = date.getFullYear()
+  const month = (date.getMonth() + 1).toString().padStart(2, '0')
+  const dayStr = day.toString().padStart(2, '0')
+  
+  return `${year}-${month}-${dayStr}`
+}
+
+// Обновление даты блока
+const updateBlockDate = async (block, newDate) => {
+  try {
+    const updatedBlock = { 
+      ...block, 
+      releaseDate: newDate
+    }
+    
+    await axios.put(`${API_URL}/blocks/${block.id}`, updatedBlock)
+    
+    // Обновляем локальное состояние
+    const index = blocks.value.findIndex(b => b.id === block.id)
+    if (index !== -1) {
+      blocks.value[index] = updatedBlock
+    }
+    
+    // Принудительно обновляем позиции
+    forceUpdatePositions()
+    
+  } catch (error) {
+    console.error('Ошибка при обновлении даты:', error)
+    throw error
+  }
+}
+// Отображение индикатора позиции при перетаскивании
+const showPositionIndicator = (x) => {
+  // Удаляем старый индикатор
+  const oldIndicator = document.querySelector('.line-position-indicator')
+  if (oldIndicator) oldIndicator.remove()
+  
+  // Создаем новый
+  const indicator = document.createElement('div')
+  indicator.className = 'line-position-indicator'
+  indicator.style.left = x + 'px'
+  
+  const grid = document.querySelector('.timeline-grid')
+  if (grid) grid.appendChild(indicator)
+}
+
+// Плавное обновление позиции линии
+const updateLinePosition = (blockId, x) => {
+  const line = document.querySelector(`.timeline-line[data-block-id="${blockId}"]`)
+  if (line) {
+    line.style.transition = 'none'
+    line.style.left = x + 'px'
+    // Принудительный ререндер
+    line.offsetHeight
+  }
+}
+
+// Обновляем обработчик dragover на timeline-grid
+const onGridDragOver = (event) => {
+  event.preventDefault()
+  
+  if ((isDraggingLine.value || isDraggingHeader.value) && draggedLineBlock.value) {
+    // Получаем позицию курсора
+    const gridRect = event.currentTarget.getBoundingClientRect()
+    const x = event.clientX - gridRect.left + timelineWrapper.value.scrollLeft
+    
+    // Ограничиваем позицию
+    const maxX = months.length * HORIZONTAL_MONTH_WIDTH + 50
+    const constrainedX = Math.max(20, Math.min(x, maxX))
+    
+    // Обновляем позиции
+    dragCurrentX.value = constrainedX
+    
+    // Вычисляем позицию блока (центрируем относительно линии)
+    // Блок смещен влево на 10px относительно линии, как в getBlockLeft
+    const blockX = constrainedX - 10
+    
+    // Обновляем позицию блока
+    blockDragCurrentX.value = blockX
+    
+    // Получаем дату для текущей позиции
+    const newDate = positionToDate(constrainedX)
+    if (newDate) {
+      previewDate.value = formatDate(newDate)
+    }
+    
+    // Показываем индикатор
+    showPositionIndicator(constrainedX)
+    
+    // Обновляем стили напрямую для плавности
+    updateElementPositions(draggedLineBlock.value.id, constrainedX, blockX)
+  }
+}
+
+// Функция для обновления позиций элементов
+const updateElementPositions = (blockId, lineX, blockX) => {
+  // Обновляем линию
+  const line = document.querySelector(`.timeline-line[data-block-id="${blockId}"]`)
+  if (line) {
+    line.style.transition = 'none'
+    line.style.left = lineX + 'px'
+    line.classList.add('line-dragging-active')
+  }
+  
+  // Обновляем блок
+  const block = document.querySelector(`.block[data-block-id="${blockId}"]`)
+  if (block) {
+    block.style.transition = 'none'
+    block.style.left = blockX + 'px'
+    block.classList.add('block-dragging')
+  }
+}
+const removePositionIndicator = () => {
+  const indicator = document.querySelector('.line-position-indicator')
+  if (indicator) indicator.remove()
+}
+
+// Обработка сброса на сетку
+const onGridDrop = async (event) => {
+  event.preventDefault()
+  event.stopPropagation()
+  
+  if (!draggedLineBlock.value) return
+  
+  try {
+    // Получаем данные о перетаскивании
+    const dragData = JSON.parse(event.dataTransfer.getData('text/plain'))
+    
+    // Проверяем, что это действительно линия
+    if (dragData.type !== 'line') return
+    
+    // Получаем блок, который перетаскиваем
+    const sourceBlock = draggedLineBlock.value
+    
+    // Получаем позицию сброса относительно контейнера
+    const rect = event.currentTarget.getBoundingClientRect()
+    
+    // Вычисляем позицию в пикселях относительно левого края с учетом прокрутки
+    const dropX = event.clientX - rect.left + timelineWrapper.value.scrollLeft
+    
+    // Конвертируем позицию в дату
+    const newDate = positionToDate(dropX)
+    
+    if (!newDate) {
+      showNotificationMessage('❌ Не удалось определить дату', 'error')
+      return
+    }
+    
+    // Обновляем дату блока
+    await updateBlockDate(sourceBlock, newDate)
+    
+    showNotificationMessage(`📅 Дата изменена на ${formatDate(newDate)}`)
+    
+    // Убираем индикатор
+    removePositionIndicator()
+    
+  } catch (error) {
+    console.error('Ошибка при перемещении линии:', error)
+    showNotificationMessage('❌ Ошибка при изменении даты', 'error')
+  }
+  
+  // Сбрасываем состояние
+  draggedLineBlock.value = null
+  isDraggingLine.value = false
+}
+// Состояние для перетаскивания шапки блока
+const draggingBlockHeader = ref(null)
+const isDraggingHeader = ref(false)
+
+// Начало перетаскивания шапки блока
+// Начало перетаскивания шапки блока
+const onBlockHeaderDragStart = (event, block) => {
+  event.stopPropagation()
+  
+  console.log('🚀 Начало перетаскивания шапки блока:', block.title)
+  
+  // Сохраняем блок
+  draggingBlockHeader.value = block
+  draggedBlockId.value = block.id
+  isDraggingHeader.value = true
+  isDraggingLine.value = true
+  draggedLineBlock.value = block
+  
+  // Получаем текущие позиции
+  const currentLeft = getLinePosition(block)
+  const blockLeft = getBlockLeft(block)
+  
+  // Запоминаем позиции
+  dragStartX.value = currentLeft
+  dragCurrentX.value = currentLeft
+  blockOriginalLeft.value = blockLeft
+  blockDragCurrentX.value = blockLeft
+  
+  // Устанавливаем данные для перетаскивания
+  event.dataTransfer.setData('text/plain', JSON.stringify({
+    blockId: block.id,
+    type: 'header'
+  }))
+  event.dataTransfer.effectAllowed = 'move'
+  
+  // Скрываем стандартное изображение
+  const canvas = document.createElement('canvas')
+  canvas.width = 1
+  canvas.height = 1
+  event.dataTransfer.setDragImage(canvas, 0, 0)
+  
+  // Добавляем классы
+  event.target.classList.add('block-header-dragging')
+  
+  // Показываем подсказку
+  previewDate.value = formatDate(block.releaseDate)
+}
+
+// Окончание перетаскивания шапки
+const onBlockHeaderDragEnd = async (event) => {
+  // Обновляем дату, если есть новое положение
+  if (isDraggingHeader.value && draggingBlockHeader.value && previewDate.value) {
+    try {
+      const [day, month, year] = previewDate.value.split('.')
+      const newDate = `${year}-${month}-${day}`
+      
+      await updateBlockDate(draggingBlockHeader.value, newDate)
+      showNotificationMessage(`📅 Блок перемещен на ${previewDate.value}`)
+    } catch (error) {
+      console.error('Ошибка при обновлении даты:', error)
+      showNotificationMessage('❌ Ошибка при перемещении', 'error')
+    }
+  }
+  
+  // Убираем классы
+  document.querySelectorAll('.block-header-dragging, .line-dragging-active').forEach(el => {
+    el.classList.remove('block-header-dragging', 'line-dragging-active')
+  })
+  
+  // Сбрасываем состояние
+  draggingBlockHeader.value = null
+  isDraggingHeader.value = false
+  draggedLineBlock.value = null
+  isDraggingLine.value = false
+  dragStartX.value = 0
+  dragCurrentX.value = 0
+  previewDate.value = ''
+  removePositionIndicator()
+}
+
+// Синхронизация позиций линии и блока
+const syncBlockAndLine = (blockId, date) => {
+  const block = blocks.value.find(b => b.id === blockId)
+  if (!block) return
+  
+  // Вычисляем новые позиции
+  const month = new Date(date).getMonth()
+  const lineX = month * HORIZONTAL_MONTH_WIDTH + 200 // центр месяца
+  const blockX = lineX - 10
+  
+  // Обновляем в DOM
+  updateElementPositions(blockId, lineX, blockX)
+}
+
+// Цвет от синего (мало) до красного (много)
+const getHeatColor = (effort) => {
+  return getEffortColor(effort, 0.8) // 0.8 - небольшая прозрачность для красоты
+}
+// Стиль для блока (пропорционально трудозатратам)
+const getBlockStyle = (block) => {
+  const effort = block.effort || 0
+  const percentOfTotal = totalEffort.value > 0 ? (effort / totalEffort.value) * 100 : 0
+  
+  return {
+    height: percentOfTotal + '%',
+    backgroundColor: getHeatColor(effort),
+    border: '1px solid rgba(255,255,255,0.3)',
+    padding: '8px 12px',
+    display: 'flex',
+    flexDirection: 'column',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    overflow: 'hidden',
+    minHeight: '30px',
+    color: 'white',
+    textShadow: '0 1px 2px rgba(0,0,0,0.3)'
+  }
+}
+// ==========================================
+// ТЕПЛОВАЯ КАРТА - ВЫЧИСЛЯЕМЫЕ СВОЙСТВА
+// ==========================================
+
+// Общая сумма трудозатрат
+const totalEffort = computed(() => {
+  if (!blocks.value || !Array.isArray(blocks.value)) return 0
+  return blocks.value.reduce((sum, block) => sum + (block.effort || 0), 0)
+})
+
+// Выполненные трудозатраты (по задачам)
+const completedEffort = computed(() => {
+  if (!blocks.value || !Array.isArray(blocks.value)) return 0
+  return blocks.value.reduce((sum, block) => {
+    if (!block.tasks || !Array.isArray(block.tasks)) return sum
+    const completedTasks = block.tasks.filter(t => t && t.status === 'done')
+    return sum + completedTasks.reduce((taskSum, task) => taskSum + (task.effort || 0), 0)
+  }, 0)
+})
+
+// Процент выполненных трудозатрат
+const completedEffortPercent = computed(() => {
+  if (totalEffort.value === 0) return 0
+  return Math.round((completedEffort.value / totalEffort.value) * 100)
+})
+
+// Блоки, отсортированные по трудозатратам (для тепловой карты)
+const sortedByEffort = computed(() => {
+  if (!blocks.value || !Array.isArray(blocks.value)) return []
+  return [...blocks.value].sort((a, b) => (b.effort || 0) - (a.effort || 0))
+})
+
+
+// Функция для расчета прямоугольников с точным заполнением
+const getRectangleStyle = (block) => {
+  const effort = block.effort || 0
+  const total = totalEffort.value
+  
+  if (total === 0) return {}
+  
+  // Процент от общих трудозатрат
+  const percent = (effort / total) * 100
+  
+  // Используем CSS Grid для точного позиционирования
+  // Здесь мы не задаем фиксированные размеры,
+  // а полагаемся на CSS Grid в родительском контейнере
+  
+  return {
+    backgroundColor: getHeatColor(effort),
+    border: '1px solid rgba(255,255,255,0.3)',
+    padding: '8px',
+    display: 'flex',
+    flexDirection: 'column',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    color: 'white',
+    textShadow: '0 1px 2px rgba(0,0,0,0.3)',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+    // Минимальные размеры для читаемости
+    minWidth: '120px',
+    minHeight: '120px',
+    // Автоматическое масштабирование
+    flex: `1 1 ${percent}%`
+  }
+}
+
+// Функция для расчета стиля блока на основе процента трудозатрат
+const getBlockAreaStyle = (block) => {
+  const effort = block.effort || 0
+  const total = totalEffort.value
+  
+  if (total === 0) return {}
+  
+  // Процент от общих трудозатрат
+  const percent = (effort / total) * 100
+  
+  // Конвертируем процент в площадь для Grid
+  // Используем grid-area с span
+  
+  return {
+    backgroundColor: getHeatColor(effort),
+    border: '1px solid rgba(255,255,255,0.3)',
+    padding: '8px',
+    display: 'flex',
+    flexDirection: 'column',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    color: 'white',
+    textShadow: '0 1px 2px rgba(0,0,0,0.3)',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+    // Блок будет занимать площадь пропорционально проценту
+    // Это будет обработано через CSS Grid в родителе
+  }
+}
+
+// Функция для расчета позиции блока в сетке
+// Функция для расчета позиции блока в сетке (квадратные блоки)
+const getBlockPosition = (block, index, allBlocks) => {
+  const effort = block.effort || 0
+  const total = totalEffort.value
+  
+  if (total === 0) return {}
+  
+  // Процент от общих трудозатрат
+  const percent = (effort / total) * 100
+  
+  // Конвертируем процент в количество ячеек сетки (100x100 = 10000 ячеек)
+  const totalCells = 10000
+  const blockCells = Math.max(50, Math.floor((percent / 100) * totalCells))
+  
+  // Делаем блок квадратным - одинаковые ширина и высота
+  const blockSize = Math.max(3, Math.min(30, Math.floor(Math.sqrt(blockCells))))
+  
+  return {
+    '--width': blockSize,
+    '--height': blockSize
+  }
+}
+// Более сложный алгоритм для идеального заполнения
+const calculateBlockPositions = (blocks) => {
+  if (!blocks.length) return []
+  
+  const total = totalEffort.value
+  const grid = [] // 2D массив для отслеживания занятых ячеек
+  const positions = []
+  
+  // Инициализируем сетку 100x100
+  for (let i = 0; i < 100; i++) {
+    grid[i] = Array(100).fill(false)
+  }
+  
+  // Сортируем блоки по убыванию (самые большие первыми)
+  const sortedBlocks = [...blocks].sort((a, b) => (b.effort || 0) - (a.effort || 0))
+  
+  sortedBlocks.forEach(block => {
+    const effort = block.effort || 0
+    const percent = (effort / total) * 100
+    const targetCells = Math.round((percent / 100) * 10000)
+    
+    // Ищем оптимальный размер блока
+    let bestSize = { cols: 1, rows: 1 }
+    let bestDiff = Infinity
+    
+    for (let cols = 1; cols <= 50; cols++) {
+      for (let rows = 1; rows <= 50; rows++) {
+        const cells = cols * rows
+        const diff = Math.abs(cells - targetCells)
+        if (diff < bestDiff) {
+          bestDiff = diff
+          bestSize = { cols, rows }
+        }
+      }
+    }
+    
+    // Ищем свободное место для блока
+    let placed = false
+    for (let row = 0; row < 100 - bestSize.rows + 1 && !placed; row++) {
+      for (let col = 0; col < 100 - bestSize.cols + 1 && !placed; col++) {
+        // Проверяем, свободны ли все ячейки
+        let free = true
+        for (let r = 0; r < bestSize.rows && free; r++) {
+          for (let c = 0; c < bestSize.cols && free; c++) {
+            if (grid[row + r][col + c]) free = false
+          }
+        }
+        
+        if (free) {
+          // Занимаем ячейки
+          for (let r = 0; r < bestSize.rows; r++) {
+            for (let c = 0; c < bestSize.cols; c++) {
+              grid[row + r][col + c] = true
+            }
+          }
+          
+          positions.push({
+            block,
+            col,
+            row,
+            cols: bestSize.cols,
+            rows: bestSize.rows
+          })
+          placed = true
+        }
+      }
+    }
+  })
+  
+  return positions
+}
+
+// Цвет задачи в зависимости от статуса
+const getTaskColor = (task) => {
+  switch(task.status) {
+    case 'done': return '#22c55e' // зеленый - выполнено
+    case 'progress': return '#eab308' // желтый - в работе
+    case 'todo': return '#94a3b8' // серый - не начато
+    default: return '#94a3b8'
+  }
+}
+
+// Размер блока в зависимости от трудозатрат
+const getBlockGridStyle = (block) => {
+  const effort = block.effort || 0
+  const maxEffort = Math.max(...blocks.value.map(b => b.effort || 0), 1)
+  
+  // Размер от 150px до 350px
+  const minSize = 150
+  const maxSize = 350
+  const size = minSize + (effort / maxEffort) * (maxSize - minSize)
+  
+  return {
+    width: size + 'px',
+    height: size + 'px',
+    backgroundColor: getEffortColor(effort, 0.9),
+    border: '1px solid rgba(255,255,255,0.3)',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+  }
+}
 </script>
 
 <style scoped>
@@ -2043,7 +2850,7 @@ const checkLinePositions = () => {
   padding: 12px 16px;
 }
 
-/* ШАПКА */
+/* ========== ШАПКА ========== */
 .header {
   flex-shrink: 0;
   margin-bottom: 10px;
@@ -2075,6 +2882,7 @@ const checkLinePositions = () => {
   border: 1px solid #e2e8f0;
 }
 
+/* ========== ТУЛБАР ========== */
 .toolbar {
   display: flex;
   justify-content: space-between;
@@ -2137,7 +2945,7 @@ const checkLinePositions = () => {
   color: #dc2626;
 }
 
-/* Обновленная статистика */
+/* ========== СТАТИСТИКА ========== */
 .statistics-top {
   display: flex;
   gap: 20px;
@@ -2187,17 +2995,17 @@ const checkLinePositions = () => {
   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 
-/* Специальные цвета для разных метрик */
-.stat-item:nth-child(1) .stat-value { color: #3b82f6; } /* Этапы - синий */
-.stat-item:nth-child(2) .stat-value { color: #22c55e; } /* Выполнено - зеленый */
-.stat-item:nth-child(3) .stat-value { color: #eab308; } /* В работе - желтый */
-.stat-item:nth-child(4) .stat-value { color: #64748b; } /* Всего задач - серый */
-.stat-item:nth-child(5) .stat-value { color: #22c55e; } /* Задач выполнено - зеленый */
+.stat-item:nth-child(1) .stat-value { color: #3b82f6; }
+.stat-item:nth-child(2) .stat-value { color: #22c55e; }
+.stat-item:nth-child(3) .stat-value { color: #eab308; }
+.stat-item:nth-child(4) .stat-value { color: #64748b; }
+.stat-item:nth-child(5) .stat-value { color: #22c55e; }
 .stat-item:nth-child(6) .stat-value { 
   background: linear-gradient(135deg, #3b82f6, #22c55e);
   color: white;
 }
-/* Навигация по месяцам/кварталам */
+
+/* ========== НАВИГАЦИЯ ========== */
 .nav-months {
   display: flex;
   gap: 4px;
@@ -2225,7 +3033,6 @@ const checkLinePositions = () => {
   cursor: pointer;
   border: none;
   background: transparent;
-  position: relative;
 }
 
 .nav-month.active {
@@ -2266,7 +3073,7 @@ const checkLinePositions = () => {
   background: #f1f5f9;
 }
 
-/* ОСНОВНОЙ КОНТЕНТ */
+/* ========== ОСНОВНОЙ КОНТЕНТ ========== */
 .main-content {
   flex: 1;
   min-height: 0;
@@ -2276,15 +3083,14 @@ const checkLinePositions = () => {
   border-radius: 16px;
   border: 1px solid #e2e8f0;
   overflow: hidden;
-  padding-left: 0px;
 }
 
-/* Шапка периодов */
-.months-header {
+/* ========== ШАПКИ ПЕРИОДОВ ========== */
+.months-header{
   flex-shrink: 0;
   height: 50px;
   background: white;
-  border-bottom: 2px solid #3b83f661;
+  border-bottom: 2px solid rgba(59, 130, 246, 0.4);
   box-shadow: 0 2px 8px rgba(0,0,0,0.05);
   overflow-x: auto;
   overflow-y: hidden;
@@ -2292,16 +3098,58 @@ const checkLinePositions = () => {
   position: relative;
 }
 
-.months-header::-webkit-scrollbar {
+
+.horizontal-header {
+   flex-shrink: 0;
+  height: 40px; /* Используем 40px */
+  background: white;
+  border-bottom: 2px solid rgba(59, 130, 246, 0.4);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  position: relative;
+  padding-left: 20px;
+  pointer-events: auto;
+}
+
+
+.months-header::-webkit-scrollbar,
+.horizontal-header::-webkit-scrollbar {
   display: none;
 }
 
-.months-header-container {
+.months-header-container,
+.horizontal-header-container {
   position: relative;
   height: 100%;
   min-width: 100%;
 }
 
+.horizontal-header-container {
+  padding-left: 20px;
+}
+
+.month-header-cell {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #162132;
+  border-right: 1px solid rgba(169, 175, 241, 0.6);
+  background: white;
+  box-sizing: border-box;
+}
+
+.month-header-cell:last-child,
+.horizontal-month-cell:last-child {
+  border-right: none;
+}
 
 .month-sub {
   font-size: 0.7rem;
@@ -2309,7 +3157,23 @@ const checkLinePositions = () => {
   color: #94a3b8;
 }
 
-/* Контейнер с прокруткой */
+.horizontal-month-cell {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1e293b;
+  background: white;
+  border-right: 1px solid #e2e8f0;
+  box-sizing: border-box;
+  z-index: 10;
+}
+
+/* ========== КОНТЕЙНЕР С ПРОКРУТКОЙ ========== */
 .timeline-wrapper {
   flex: 1;
   overflow: auto;
@@ -2337,10 +3201,9 @@ const checkLinePositions = () => {
   position: relative;
   min-width: min-content;
   padding-left: 20px;
-  
 }
 
-/* СЕТКА */
+/* ========== СЕТКА ========== */
 .timeline-grid {
   background-image: none !important;
   background-color: transparent !important;
@@ -2348,22 +3211,32 @@ const checkLinePositions = () => {
   z-index: 1;
 }
 
-/* Вертикальные разделители месяцев */
+/* Вертикальные линии для дней */
+.horizontal-day-line {
+  position: absolute;
+  top: -30px;
+  bottom: 0;
+  width: 1px;
+  background: rgba(203, 213, 225, 0.2);
+  pointer-events: none;
+  z-index: 1;
+  transform: translateX(-17px);
+}
+
+/* Линии начала месяца */
+.horizontal-month-line,
 .month-divider {
   position: absolute;
-  top: 0;
+  top: -30px;
   bottom: 0;
   width: 2px;
-  background: transparent; /* синий цвет для наглядности */
-  opacity: 0.2;
+  background: rgba(59, 130, 246, 0.4);
   pointer-events: none;
-  z-index: 5;
-  transform: translateX(-1px); /* центрируем по границе */
+  z-index: 2;
   box-shadow: 0 0 4px rgba(59, 130, 246, 0.3);
-  
-  
+  transform: translateX(-17px);
 }
-/* Горизонтальные линии рядов */
+
 .row-line {
   position: absolute;
   left: 0;
@@ -2375,29 +3248,7 @@ const checkLinePositions = () => {
   z-index: 1;
 }
 
-/* Шапка месяцев */
-.month-header-cell {
-  position: absolute;
-  top: 0;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: #162132;
-  border-right: 1px solid #a9aff194; /* светлая граница */
-  background: white;
-  box-sizing: border-box;
-}
-
-/* Последняя ячейка без границы */
-.month-header-cell:last-child {
-  border-right: none;
-}
-
-/* БЛОКИ */
+/* ========== БЛОКИ ========== */
 .block {
   position: absolute;
   border-radius: 8px;
@@ -2408,19 +3259,17 @@ const checkLinePositions = () => {
   z-index: 20;
   min-width: 150px;
   max-height: 600px;
-  overflow: auto;
   font-size: 0.8rem;
   padding: 8px 10px;
   box-sizing: border-box;
   cursor: pointer;
-  transform: none; 
-   overflow: visible !important; /* разрешить выход за границы */
+  overflow: visible !important;
 }
 
 .block:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-  z-index: 20;
+  z-index: 21;
 }
 
 .block-accent {
@@ -2436,6 +3285,21 @@ const checkLinePositions = () => {
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 6px;
+  cursor: grab;
+  user-select: none;
+  padding: 4px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.5);
+  transition: all 0.2s;
+}
+
+.block-header:active {
+  cursor: grabbing;
+}
+
+.block-header:hover {
+  background: rgba(59, 130, 246, 0.1);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
 }
 
 .block-title-container {
@@ -2461,6 +3325,11 @@ const checkLinePositions = () => {
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.6; }
+}
+
+.block-title-wrapper {
+  flex: 1;
+  min-width: 0;
 }
 
 .block-title {
@@ -2489,11 +3358,6 @@ const checkLinePositions = () => {
   color: #475569;
   margin-bottom: 6px;
   line-height: 1.3;
-}
-
-.description-icon {
-  width: 14px;
-  text-align: center;
 }
 
 .description-text {
@@ -2534,58 +3398,12 @@ const checkLinePositions = () => {
 .release-date:hover {
   background: #e2e8f0;
 }
-/*статус блоков*/
+
 .block-status {
   font-size: 0.65rem;
   color: #64748b;
   display: block;
   margin-top: 2px;
-}
-
-.block-title-wrapper {
-  flex: 1;
-  min-width: 0;
-}
-
-.block-title {
-  font-weight: 600;
-  font-size: 0.9rem;
-  color: #0f172a;
-  word-break: break-word;
-  line-height: 1.3;
-  margin: 0;
-}
-
-/* Чекбоксы */
-.block-checkbox {
-  border-top: 1px solid #f1f5f9;
-  padding-top: 6px;
-  margin-top: 4px;
-}
-
-.checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  font-size: 0.7rem;
-  color: #64748b;
-  user-select: none;
-}
-
-.checkbox-label input[type="checkbox"] {
-  width: 14px;
-  height: 14px;
-  cursor: pointer;
-  accent-color: #3b82f6;
-}
-
-.checkbox-text {
-  transition: color 0.2s;
-}
-
-.checkbox-label:hover .checkbox-text {
-  color: #3b82f6;
 }
 
 /* Выполненные блоки */
@@ -2609,19 +3427,6 @@ const checkLinePositions = () => {
   color: #94a3b8;
 }
 
-.effort-progress {
-  height: 3px;
-  background: #f1f5f9;
-  overflow: hidden;
-  margin-top: 6px;
-  border-radius: 0 0 8px 8px;
-}
-
-.effort-progress-bar {
-  height: 100%;
-  transition: width 0.3s ease;
-}
-
 /* Редактор даты в блоке */
 .block-date-editor {
   margin-bottom: 8px;
@@ -2643,317 +3448,24 @@ const checkLinePositions = () => {
   border-color: #2563eb;
 }
 
-/* Стиль для блока в режиме редактирования */
 .block.editing {
   box-shadow: 0 0 0 2px #3b82f6;
 }
 
-/* ===== МОДАЛЬНОЕ ОКНО (УПРОЩЕННОЕ) ===== */
-/* ===== МОДАЛЬНОЕ ОКНО ===== */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.3);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 2000;
-  backdrop-filter: blur(5px);
-}
-
-.modal {
-  background: white;
-  border-radius: 24px;
-  padding: 20px; /* уменьшили с 24px до 20px */
-  width: 560px; /* увеличили с 460px до 560px */
-  max-width: 95%;
-  max-height: 85vh;
-  overflow-y: auto;
-  box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px; /* уменьшили с 20px до 16px */
-}
-
-.modal-header h3 {
-  font-size: 1.4rem; /* чуть уменьшили */
-  font-weight: 500;
-  color: #0f172a;
-  margin: 0;
-}
-
-.btn-close {
-  width: 32px; /* уменьшили */
-  height: 32px; /* уменьшили */
-  border-radius: 16px;
-  border: none;
-  background: transparent;
-  font-size: 1.1rem;
-  cursor: pointer;
-  color: #94a3b8;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-}
-
-.btn-close:hover {
+.effort-progress {
+  height: 3px;
   background: #f1f5f9;
-  color: #1e293b;
-}
-
-/* Секции */
-.modal-section {
-  margin-bottom: 20px; /* уменьшили */
-  padding-bottom: 16px; /* уменьшили */
-  border-bottom: 1px solid #f1f5f9;
-}
-
-.modal-section:last-of-type {
-  border-bottom: none;
-  margin-bottom: 12px;
-  padding-bottom: 0;
-}
-
-/* Формы */
-.form-group {
-  margin-bottom: 16px; /* уменьшили */
-}
-
-.form-group label {
-  display: block;
-  font-size: 0.8rem; /* чуть уменьшили */
-  color: #64748b;
-  margin-bottom: 4px; /* уменьшили */
-  font-weight: 500;
-  letter-spacing: 0.3px;
-}
-
-.form-group input,
-.form-group textarea {
-  width: 100%;
-  padding: 10px 14px; /* уменьшили вертикальный padding */
-  border: 1px solid #e2e8f0;
-  border-radius: 14px; /* чуть уменьшили */
-  font-size: 0.95rem;
-  font-family: inherit;
-  transition: all 0.2s;
-  background: #ffffff;
-}
-
-.form-group input:focus,
-.form-group textarea:focus {
-  outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-.form-group textarea {
-  resize: vertical;
-  min-height: 70px; /* уменьшили */
-  line-height: 1.5;
-}
-
-.form-row {
-  display: flex;
-  gap: 16px;
-}
-
-.form-row .form-group {
-  flex: 1;
-}
-
-/* Трудозатраты */
-.effort-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px; /* уменьшили */
-}
-
-.effort-header label {
-  font-size: 0.8rem;
-  color: #64748b;
-  font-weight: 500;
-}
-
-.effort-value {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: #3b82f6;
-  background: #eff6ff;
-  padding: 4px 10px;
-  border-radius: 30px;
-}
-
-.effort-input {
-  margin-bottom: 6px; /* уменьшили */
-}
-
-.effort-range {
-  width: 100%;
-  height: 6px;
-  border-radius: 3px;
-  background: linear-gradient(90deg, #22c55e, #eab308, #f97316, #ef4444);
-  -webkit-appearance: none;
-}
-
-.effort-range::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 18px; /* чуть уменьшили */
-  height: 18px; /* чуть уменьшили */
-  border-radius: 50%;
-  background: white;
-  border: 2px solid #3b82f6;
-  cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-}
-
-/* Мини-шкала */
-.thermal-mini {
-  position: relative;
-  height: 24px; /* уменьшили */
-  margin-top: 4px; /* уменьшили */
-}
-
-.thermal-mini-bar {
-  display: flex;
-  height: 6px; /* уменьшили */
-  width: 100%;
-  border-radius: 3px;
   overflow: hidden;
-  margin-top: 10px; /* уменьшили */
+  margin-top: 6px;
+  border-radius: 0 0 8px 8px;
 }
 
-.thermal-mini-segment {
-  flex: 1;
+.effort-progress-bar {
   height: 100%;
+  transition: width 0.3s ease;
 }
 
-.thermal-mini-indicator {
-  position: absolute;
-  top: -2px; /* подняли */
-  transform: translateX(-50%);
-  color: #3b82f6;
-  font-size: 1rem; /* уменьшили */
-  line-height: 1;
-  transition: left 0.2s;
-}
-
-/* Футер */
-.modal-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 12px; /* уменьшили */
-  padding-top: 12px; /* уменьшили */
-  border-top: 1px solid #f1f5f9;
-}
-
-.footer-left {
-  display: flex;
-  gap: 8px;
-}
-
-.footer-right {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-/* Кнопки */
-.btn {
-  border: none;
-  cursor: pointer;
-  font-family: inherit;
-  transition: all 0.2s;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.btn-text {
-  background: transparent;
-  border: 1px solid #e2e8f0;
-  color: #64748b;
-  padding: 8px 18px; /* чуть уменьшили горизонтальный padding */
-  border-radius: 30px;
-  font-size: 0.85rem; /* чуть уменьшили */
-}
-
-.btn-text:hover {
-  background: #f1f5f9;
-  color: #1e293b;
-  border-color: #94a3b8;
-}
-
-.btn-secondary {
-  background: white;
-  border: 1px solid #e2e8f0;
-  color: #64748b;
-  padding: 8px 18px; /* чуть уменьшили */
-  border-radius: 30px;
-  font-size: 0.85rem; /* чуть уменьшили */
-  gap: 6px;
-}
-
-.btn-secondary:hover {
-  background: #f1f5f9;
-  color: #1e293b;
-  border-color: #94a3b8;
-}
-
-.btn-danger {
-  background: white;
-  border: 1px solid #fee2e2;
-  color: #ef4444;
-  width: 38px; /* чуть уменьшили */
-  height: 38px; /* чуть уменьшили */
-  border-radius: 19px;
-  font-size: 1.1rem; /* чуть уменьшили */
-  padding: 0;
-}
-
-.btn-danger:hover {
-  background: #fee2e2;
-  color: #dc2626;
-}
-
-/* Адаптивность */
-@media (max-width: 640px) {
-  .modal {
-    padding: 16px;
-    width: 95%;
-  }
-  
-  .modal-header h3 {
-    font-size: 1.2rem;
-  }
-  
-  .form-row {
-    flex-direction: column;
-    gap: 0;
-  }
-  
-  .btn-text {
-    display: none;
-  }
-  
-  .footer-right {
-    width: 100%;
-    justify-content: flex-end;
-  }
-}
-
-/* СПИСОК ЗАДАЧ */
+/* ========== ЗАДАЧИ ========== */
 .block-tasks {
   margin: 8px 0;
   padding: 6px 8px;
@@ -2980,19 +3492,18 @@ const checkLinePositions = () => {
 .add-task-btn {
   width: 25px;
   height: 25px;
-  border-radius: 15px; /* круглая кнопка */
+  border-radius: 15px;
   border: 1px solid #3b82f6;
   background: white;
   color: #3b82f6;
   font-size: 1rem;
   cursor: pointer;
-  display: flex; /* Важно: flex, чтобы центрировать содержимое */
-  align-items: center; /* Центрируем по вертикали */
-  justify-content: center; /* Центрируем по горизонтали */
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: all 0.2s;
-  padding: 0; /* Убираем лишние отступы */
-  margin: 0; /* Убираем внешние отступы, если есть */
-  line-height: 1; /* Чтобы текст не съезжал по высоте */
+  padding: 0;
+  line-height: 1;
 }
 
 .add-task-btn:hover {
@@ -3005,29 +3516,22 @@ const checkLinePositions = () => {
   overflow-y: auto;
 }
 
-.task-item:active {
-  cursor: grabbing;
-}
-/* Отключаем перетаскивание для интерактивных элементов */
-.task-checkbox input,
-.task-edit-btn,
-.task-delete-btn {
-  cursor: pointer;
+.task-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 6px 0;
+  border-bottom: 1px solid #e2e8f0;
+  transition: all 0.2s ease;
+  cursor: grab;
   user-select: none;
+  position: relative;
 }
+
 .task-item:active {
   cursor: grabbing;
 }
 
-/* Отключаем перетаскивание для интерактивных элементов */
-.task-checkbox input,
-.task-edit-btn,
-.task-delete-btn {
-  cursor: pointer;
-  user-select: none;
-}
-
-/* Стиль для перетаскиваемого элемента */
 .task-item.dragging {
   opacity: 0.5;
   transform: scale(0.98) rotate(1deg);
@@ -3035,9 +3539,15 @@ const checkLinePositions = () => {
   cursor: grabbing;
   background: white;
   z-index: 1000;
+  animation: float 0.3s ease;
 }
 
-/* Стиль для места вставки */
+@keyframes float {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+  100% { transform: translateY(0); }
+}
+
 .task-item.drag-over {
   border: 2px dashed #3b82f6;
   background: #eff6ff;
@@ -3046,7 +3556,6 @@ const checkLinePositions = () => {
   position: relative;
 }
 
-/* Индикатор позиции */
 .task-item.drag-over::before {
   content: '';
   position: absolute;
@@ -3064,93 +3573,64 @@ const checkLinePositions = () => {
   50% { opacity: 1; transform: scaleX(1); }
 }
 
-/* Стиль для пустого списка при перетаскивании */
-.tasks-empty {
-  min-height: 40px;
-  border: 2px dashed #cbd5e1;
-  border-radius: 6px;
-  background: #f8fafc;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.tasks-empty[draggable="true"]:hover,
-.tasks-empty[ondragover] {
-  border-color: #3b82f6;
-  background: #eff6ff;
-  transform: scale(1.02);
-}
-
-/* Убираем точечки */
-.task-drag-handle {
-  display: none; /* полностью скрываем */
-}
-
-/* Анимация для перетаскивания */
-@keyframes float {
-  0% { transform: translateY(0); }
-  50% { transform: translateY(-2px); }
-  100% { transform: translateY(0); }
-}
-
-.task-item.dragging {
-  animation: float 0.3s ease;
-}
-
-/* Индикатор позиции при перетаскивании */
-.task-item.drag-over::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: #3b82f6;
-  top: -1px;
-  animation: pulse 1s infinite;
-}
-
-
 .task-item:last-child {
   border-bottom: none;
 }
 
-.task-completed .task-title {
+.task-status {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 12px;
+  transition: all 0.2s;
+  margin-right: 2px;
+}
+
+.task-status:hover {
+  background: #f1f5f9;
+  transform: scale(1.1);
+}
+
+.status-icon {
+  font-size: 1rem;
+  line-height: 1;
+  transition: all 0.2s;
+}
+
+.task-done .task-title {
   text-decoration: line-through;
   color: #94a3b8;
 }
 
-.task-checkbox {
-  flex-shrink: 0;
-  padding-top: 2px;
-}
-
-.task-checkbox input[type="checkbox"] {
-  width: 14px;
-  height: 14px;
-  cursor: pointer;
-  accent-color: #3b82f6;
+.task-progress .task-title {
+  color: #1e293b;
+  font-weight: 500;
 }
 
 .task-content {
   flex: 1;
   min-width: 0;
+  padding-top: 2px;
 }
 
 .task-title {
   font-size: 0.75rem;
   color: #1e293b;
   word-break: break-word;
-  cursor: pointer;
-  padding: 2px 4px;
+  cursor: text;
+  padding: 4px 6px;
   border-radius: 4px;
+  transition: all 0.2s;
 }
 
 .task-title:hover {
   background: #e2e8f0;
+  outline: 1px solid #3b82f6;
 }
-
 
 .task-actions {
   display: flex;
@@ -3189,38 +3669,6 @@ const checkLinePositions = () => {
   color: #ef4444;
 }
 
-.tasks-empty {
-  text-align: center;
-  padding: 8px 0;
-}
-
-.empty-text {
-  font-size: 0.7rem;
-  color: #94a3b8;
-  font-style: italic;
-}
-/* Уведомления */
-.notification {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  padding: 8px 16px;
-  border-radius: 30px;
-  color: white;
-  font-size: 0.85rem;
-  z-index: 2500;
-  animation: slideIn 0.2s;
-}
-
-.notification.success { background: #10b981; }
-.notification.error { background: #ef4444; }
-
-@keyframes slideIn {
-  from { transform: translateX(100%); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
-}
-
-/* Режим редактирования задачи */
 .task-edit-mode {
   width: 100%;
 }
@@ -3239,7 +3687,34 @@ const checkLinePositions = () => {
 .task-edit-input:focus {
   border-color: #2563eb;
 }
-/* Прогресс-бар выполнения задач */
+
+.tasks-empty {
+  min-height: 40px;
+  border: 2px dashed #cbd5e1;
+  border-radius: 6px;
+  background: #f8fafc;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 8px 0;
+}
+
+.tasks-empty[draggable="true"]:hover,
+.tasks-empty[ondragover] {
+  border-color: #3b82f6;
+  background: #eff6ff;
+  transform: scale(1.02);
+}
+
+.empty-text {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+/* ========== ПРОГРЕСС ========== */
 .task-progress {
   margin: 10px 0 8px 0;
   padding: 8px 10px;
@@ -3288,208 +3763,42 @@ const checkLinePositions = () => {
   transition: width 0.3s ease, background-color 0.3s ease;
   border-radius: 3px;
 }
-/* Статусы задач */
-.task-status {
-  flex-shrink: 0;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  border-radius: 12px;
-  transition: all 0.2s;
-  margin-right: 2px;
-}
 
-.task-status:hover {
-  background: #f1f5f9;
-  transform: scale(1.1);
-}
-
-.status-icon {
-  font-size: 1rem;
-  line-height: 1;
-  transition: all 0.2s;
-}
-
-/* Стили для разных статусов */
-.task-done .task-title {
-  text-decoration: line-through;
-  color: #94a3b8;
-}
-
-.task-progress .task-title {
-  color: #1e293b;
-  font-weight: 500;
-}
-
-/* Анимация смены статуса */
-.task-status:active {
-  transform: scale(0.9);
-}
-
-/* Подсветка при наведении */
-.task-item:hover .task-status {
-  background: #e2e8f0;
-}
-
-/* Обновляем существующие стили */
-.task-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  padding: 6px 0;
-  border-bottom: 1px solid #e2e8f0;
-  transition: all 0.2s ease;
-  cursor: grab;
-  user-select: none;
-  position: relative;
-}
-
-.task-checkbox {
-  display: none; /* Скрываем старый чекбокс */
-}
-
-.task-content {
-  flex: 1;
-  min-width: 0;
-  padding-top: 2px;
-}
-
-.task-title {
-  font-size: 0.75rem;
-  color: #1e293b;
-  word-break: break-word;
-  cursor: pointer;
-  padding: 2px 4px;
-  border-radius: 4px;
-  transition: all 0.2s;
-}
-
-.task-title:hover {
-  background: #e2e8f0;
-}
-
-.task-actions {
-  display: flex;
-  gap: 2px;
-  flex-shrink: 0;
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-
-
-.btn-info {
-  background: #64748b;
-  color: white;
-  border-color: #475569;
-}
-
-.btn-info:hover {
-  background: #475569;
-}
-/* Горизонтальный режим */
-.horizontal-header {
-  flex-shrink: 0;
-  height: 40px;
-  background: white;
-  border-bottom: 2px solid #3b82f6;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0);
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
-  position: relative;
-  padding-left: 20px;
-}
-
-.horizontal-header::-webkit-scrollbar {
-  display: none;
-}
-
-.horizontal-header-container {
-  position: relative;
-  height: 100%;
-  min-width: 100%;
-  padding-left: 20px;
-  
-}
-
-
-/* Вертикальные линии для дней */
-.horizontal-day-line {
-  position: absolute;
-  top: -30px;
-  bottom: 0;
-  width: 1px;
-  background: rgba(203, 213, 225, 0.2);
-  pointer-events: none;
-  z-index: 1;
-  transform: translateX(-17px); /* убираем смещения */
-}
-
-/* Линии начала месяца */
-.horizontal-month-line {
-  position: absolute;
-  top: -30px;
-  bottom: 0;
-  width: 2px;
-  background: rgba(59, 130, 246, 0.4);
-  pointer-events: none;
-  z-index: 2;
-  box-shadow: 0 0 4px rgba(59, 130, 246, 0.3);
-  transform: translateX(-17px);
-}
-
-/* Убираем возможные смещения у ячеек месяцев */
-/* Ячейки месяцев в горизонтальном режиме */
-.horizontal-month-cell {
-  position: absolute;
-  top: 0;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: #1e293b;
-  background: white;
-  border-right: 1px solid #e2e8f0;
-  box-sizing: border-box;
-  transform: translateX(0);
-  z-index: 10;
-}
-
-
-/* Слой для линий - под блоками */
+/* ========== ЛИНИИ ========== */
 .lines-layer {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  pointer-events: none;
+  pointer-events: auto;
   z-index: 5;
 }
 
-/* Линия */
 .timeline-line {
   position: absolute;
   width: 2px;
   background: #3b82f6;
   opacity: 0.7;
-  transition: opacity 0.2s;
+  transition: opacity 0.2s, width 0.2s, background 0.2s;
   transform: translateX(-50%);
+  cursor: grab;
+  user-select: none;
+  z-index: 15;
+  pointer-events: auto;
+  -webkit-user-drag: element;
+  user-drag: element;
+  will-change: left, width, background;
 }
 
+.timeline-line:active {
+  cursor: grabbing;
+}
 
-
-/* Для последнего дня месяца - дополнительное смещение влево */
 .timeline-line[data-lastday="true"] {
-  transform: translateX(-50%) translateX(-8px); /* смещение влево */
+  transform: translateX(-50%) translateX(-8px);
 }
 
-/* Точка у блока */
 .timeline-line .line-dot {
   position: absolute;
   bottom: 0;
@@ -3503,7 +3812,6 @@ const checkLinePositions = () => {
   transition: all 0.2s;
 }
 
-/* Метка с датой */
 .timeline-line .line-date {
   position: absolute;
   bottom: -20px;
@@ -3516,30 +3824,550 @@ const checkLinePositions = () => {
   border-radius: 16px;
   white-space: nowrap;
   opacity: 1;
-  transition: opacity 0.2s, transform 0.2s;
-  pointer-events: none;
+  transition: all 0.2s;
+  pointer-events: auto;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   z-index: 30;
+  cursor: grab;
+  user-select: none;
 }
 
-/* Коррекция метки для последнего дня */
+.line-date:active {
+  cursor: grabbing;
+}
+
+.line-date:hover {
+  transform: translateX(-50%) scale(1.1) !important;
+  background: #2563eb !important;
+  box-shadow: 0 4px 15px rgba(37, 99, 235, 0.5) !important;
+}
+
 .timeline-line[data-lastday="true"] .line-date {
   left: auto;
   right: 0;
   transform: translateX(0);
 }
 
-/* Для первого дня месяца */
-.timeline-line:first-child .line-date {
+.timeline-line[data-lastday="true"]:hover .line-date {
+  transform: translateX(0) translateY(-2px) !important;
+}
+
+.timeline-line:hover {
+  opacity: 1;
+  width: 4px;
+  background: #2563eb;
+}
+
+.timeline-line:hover .line-dot {
+  transform: translateX(-50%) scale(1.5);
+  background: #2563eb;
+}
+
+.timeline-line:hover .line-date {
+  transform: translateX(-50%) translateY(-2px);
+  background: #2563eb;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* ========== ПЕРЕТАСКИВАНИЕ ========== */
+.timeline-line.line-dragging-active,
+.timeline-line.line-dragging-active .line-date {
+  transition: none !important;
+}
+
+.timeline-line.line-dragging-active {
+  opacity: 1 !important;
+  width: 4px !important;
+  background: #2069d6 !important;
+  box-shadow: 0 0 20px rgba(37, 21, 162, 0.8) !important;
+  z-index: 1000 !important;
+}
+
+.timeline-line.line-dragging-active .line-dot {
+  width: 12px !important;
+  height: 12px !important;
+  background: #2069d6 !important;
+  box-shadow: 0 0 15px rgba(37, 21, 162, 0.8)!important;
+}
+
+.timeline-line.line-dragging-active .line-date,
+.line-date-dragging {
+  background: #2069d6 !important;
+  transform: translateX(-50%) scale(1.2) !important;
+  box-shadow: 0 4px 20px rgba(37, 21, 162, 0.8) !important;
+  font-weight: bold !important;
+  z-index: 1001 !important;
+}
+
+.timeline-line.line-dragging-active[data-lastday="true"] .line-date {
+  transform: translateX(0) scale(1.2) !important;
+}
+
+.block-header-dragging {
+  opacity: 0.8;
+  background: rgba(59, 130, 246, 0.2) !important;
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3) !important;
+  transform: scale(1.02);
+}
+
+.block.block-dragging {
+  opacity: 0.9;
+  box-shadow: 0 8px 25px rgba(239, 68, 68, 0.3) !important;
+  border: 2px solid #2069d6 !important;
+  transform: scale(1.02);
+  transition: none !important;
+  z-index: 1001 !important;
+  animation: blockPulse 1.5s infinite;
+}
+
+@keyframes blockPulse {
+  0% { box-shadow: 0 8px 25px rgba(239, 68, 68, 0.3); }
+  50% { box-shadow: 0 12px 35px rgba(239, 68, 68, 0.5); }
+  100% { box-shadow: 0 8px 25px rgba(239, 68, 68, 0.3); }
+}
+
+
+
+.is-dragging * {
+  transition: none !important;
+}
+
+[draggable="true"] {
+  -webkit-user-drag: element;
+  user-drag: element;
+}
+
+/* ========== ИНДИКАТОР ПОЗИЦИИ ========== */
+.line-position-indicator {
+  position: absolute;
+  width: 2px;
+  height: 100%;
+  background: #3b82f6;
+  opacity: 0.5;
+  pointer-events: none;
+  z-index: 50;
+  animation: indicatorPulse 1s infinite;
+}
+
+@keyframes indicatorPulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.8; }
+}
+
+/* ========== МОДАЛЬНОЕ ОКНО ========== */
+.modal-overlay {
+  position: fixed;
+  top: 0;
   left: 0;
-  transform: translateX(-50%);
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+  backdrop-filter: blur(5px);
 }
 
-
-/* Для последнего дня при наведении */
-.block:hover ~ .lines-layer .timeline-line[data-lastday="true"][data-block-id] .line-date {
-  transform: translateX(0) translateY(-2px);
+.modal {
+  background: white;
+  border-radius: 24px;
+  padding: 20px;
+  width: 560px;
+  max-width: 95%;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.modal-header h3 {
+  font-size: 1.4rem;
+  font-weight: 500;
+  color: #0f172a;
+  margin: 0;
+}
+
+.btn-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 16px;
+  border: none;
+  background: transparent;
+  font-size: 1.1rem;
+  cursor: pointer;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.btn-close:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+.modal-section {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.modal-section:last-of-type {
+  border-bottom: none;
+  margin-bottom: 12px;
+  padding-bottom: 0;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-bottom: 4px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+}
+
+.form-group input,
+.form-group textarea {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  transition: all 0.2s;
+  background: #ffffff;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 70px;
+  line-height: 1.5;
+}
+
+.form-row {
+  display: flex;
+  gap: 16px;
+}
+
+.form-row .form-group {
+  flex: 1;
+}
+
+.effort-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.effort-header label {
+  font-size: 0.8rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.effort-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #3b82f6;
+  background: #eff6ff;
+  padding: 4px 10px;
+  border-radius: 30px;
+}
+
+.effort-input {
+  margin-bottom: 6px;
+}
+
+.effort-range {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #22c55e, #eab308, #f97316, #ef4444);
+  -webkit-appearance: none;
+}
+
+.effort-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: white;
+  border: 2px solid #3b82f6;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.footer-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* ========== УВЕДОМЛЕНИЯ ========== */
+.notification {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  padding: 8px 16px;
+  border-radius: 30px;
+  color: white;
+  font-size: 0.85rem;
+  z-index: 2500;
+  animation: slideIn 0.2s;
+}
+
+.notification.success { background: #10b981; }
+.notification.error { background: #ef4444; }
+
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* ========== АДАПТИВНОСТЬ ========== */
+@media (max-width: 640px) {
+  .modal {
+    padding: 16px;
+    width: 95%;
+  }
+  
+  .modal-header h3 {
+    font-size: 1.2rem;
+  }
+  
+  .form-row {
+    flex-direction: column;
+    gap: 0;
+  }
+  
+  .btn-text {
+    display: none;
+  }
+  
+  .footer-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+/* ========== ТЕПЛОВАЯ КАРТА - БЛОКИ С ЗАДАЧАМИ ========== */
+.heatmap-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+.heatmap-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 16px;
+  background: white;
+  padding: 16px 20px;
+  border: 0px solid #e2e8f0;
+}
+
+.heatmap-title-section h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 12px 0;
+}
+
+.heatmap-legend {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: #475569;
+}
+
+.legend-color {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+}
+
+.heatmap-stats {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.heatmap-stat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.heatmap-stat .stat-icon {
+  font-size: 1.1rem;
+}
+
+.heatmap-stat .stat-label {
+  color: #64748b;
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.heatmap-stat .stat-value {
+  font-weight: 600;
+  color: #0f172a;
+  background: #f1f5f9;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+}
+
+.heatmap-container {
+  flex: 1;
+  overflow: auto;
+  padding: 20px;
+  background: white;
+  border: 1px solid #e2e8f0;
+}
+
+/* СЕТКА для блоков */
+.heatmap-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5x;
+  justify-content: flex-start;
+  align-items: flex-start;
+}
+
+.heatmap-block {
+  border-radius: 0px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.heatmap-block:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 12px 24px rgba(0,0,0,0.2);
+  z-index: 10;
+}
+
+.heatmap-block-header {
+  margin-bottom: 12px;
+}
+
+.heatmap-block-title {
+  font-weight: 600;
+  font-size: 1rem;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.heatmap-block-effort {
+  font-size: 0.9rem;
+  font-weight: 500;
+  background: rgba(0,0,0,0.2);
+  padding: 2px 8px;
+  border-radius: 20px;
+  display: inline-block;
+}
+
+/* Сетка задач */
+.heatmap-tasks-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: auto;
+  max-height: 60%;
+  overflow-y: auto;
+  padding: 4px;
+  background: rgba(0,0,0,0.1);
+  border-radius: 8px;
+}
+
+.heatmap-task-square {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.heatmap-task-square:hover {
+  transform: scale(1.2);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+}
+
+.heatmap-no-tasks {
+  width: 100%;
+  text-align: center;
+  padding: 8px;
+  color: rgba(255,255,255,0.7);
+  font-size: 0.8rem;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .heatmap-grid {
+    justify-content: center;
+  }
+  
+  .heatmap-block {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 200px;
+  }
+  
+  .heatmap-task-square {
+    width: 20px;
+    height: 20px;
+  }
+}
 
 </style>
