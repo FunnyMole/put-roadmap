@@ -30,13 +30,13 @@
             📊 По кварталам
           </button>
           <!-- НОВАЯ КНОПКА ТЕПЛОВОЙ КАРТЫ -->
-            <button 
-              class="btn" 
-              :class="{ active: viewMode === 'heatmap' }" 
-              @click="setViewMode('heatmap')"
-            >
-              🔥 Тепловая карта
-            </button>
+             <button 
+    class="btn" 
+    :class="{ active: viewMode === 'heatmap' }" 
+    @click="setViewMode('heatmap')"
+  >
+    🔥 Тепловая карта
+  </button>
         </div>
         <div class="toolbar-group">
           <button class="btn btn-primary" @click="createNewBlock">+ Новый этап</button>
@@ -120,28 +120,24 @@
           </div>
         </div>
 
-    <!-- ТЕПЛОВАЯ КАРТА - БЛОКИ С ЗАДАЧАМИ В ВИДЕ КВАДРАТИКОВ -->
+ <!-- ТЕПЛОВАЯ КАРТА - TREEMAP -->
 <div v-if="viewMode === 'heatmap'" class="heatmap-view">
   <div class="heatmap-header">
     <div class="heatmap-title-section">
-      <h2>🔥 Тепловая карта трудозатрат</h2>
+      <h2>📊 Тепловая карта трудозатрат</h2>
       <div class="heatmap-legend">
-        <div class="legend-item">
-          <span class="legend-color" :style="{ background: getEffortColor(50, 1) }"></span>
-          <span>50 ч</span>
-        </div>
-        <div class="legend-item">
-          <span class="legend-color" :style="{ background: getEffortColor(250, 1) }"></span>
-          <span>250 ч</span>
-        </div>
-        <div class="legend-item">
-          <span class="legend-color" :style="{ background: getEffortColor(500, 1) }"></span>
-          <span>500 ч</span>
-        </div>
-        <div class="legend-item">
-          <span class="legend-color" :style="{ background: getEffortColor(800, 1) }"></span>
-          <span>800+ ч</span>
-        </div>
+  <div class="legend-item">
+    <span class="legend-color" style="background: #22c55e;"></span>
+    <span>✅ Все задачи выполнены</span>
+  </div>
+  <div class="legend-item">
+    <span class="legend-color" style="background: #3b82f6;"></span>
+    <span>🔄 В работе / частично</span>
+  </div>
+  <div class="legend-item">
+    <span class="legend-color" style="background: #94a3b8;"></span>
+    <span>⏸️ Не начато / нет задач</span>
+  </div>
       </div>
     </div>
     
@@ -165,40 +161,48 @@
   </div>
   
   <div class="heatmap-container">
-    <!-- СЕТКА для блоков -->
-    <div class="heatmap-grid">
-      <div 
-        v-for="block in sortedByEffort" 
-        :key="block.id"
-        class="heatmap-block"
-        :style="getBlockGridStyle(block)"
-        @click="editBlock(block)"
-        :title="`${block.title}: ${block.effort || 0} ч`"
-      >
-        <!-- Название этапа и трудозатраты -->
-        <div class="heatmap-block-header">
-          <div class="heatmap-block-title">{{ block.title }}</div>
-          <div class="heatmap-block-effort">{{ block.effort || 0 }} ч</div>
+    <!-- ОСНОВНАЯ ОБЛАСТЬ (этапы) -->
+    <div class="treemap-area" ref="treemapArea">
+  <!-- БЛОКИ ЭТАПОВ -->
+  <div 
+    v-for="stage in stagePositions" 
+    :key="stage.id"
+    class="treemap-stage"
+    :style="getStageStyle(stage)"
+    @click="editBlock(getOriginalBlock(stage.id))"
+  >
+    <!-- ШАПКА ЭТАПА -->
+<div class="stage-header">
+  <div class="stage-title" :title="stage.title">{{ stage.title }}</div>
+  <div class="stage-metrics">
+    <span class="stage-effort">{{ stage.effort }}ч</span>
+    <span class="stage-progress">{{ getTaskProgress(getOriginalBlock(stage.id)) }}%</span>
+    <span class="stage-date">{{ formatDate(stage.releaseDate) }}</span>
+  </div>
+</div>
+    
+    <!-- ОБЛАСТЬ ЗАДАЧ -->
+    <div class="tasks-area">
+      <template v-if="taskPositions[stage.id] && taskPositions[stage.id].length > 0">
+        <div 
+          v-for="task in taskPositions[stage.id]" 
+          :key="task.id"
+          class="treemap-task"
+          :style="getTaskStyle(task)"
+          @click.stop="editTaskFromStage(stage.id, task.id)"
+          :title="task.title"
+        >
+          <span class="task-label">{{ getTaskInitials(task.title) }}</span>
         </div>
-        
-        <!-- Задачи в виде квадратиков -->
-        <div class="heatmap-tasks-grid">
-          <div 
-            v-for="task in block.tasks" 
-            :key="task.id"
-            class="heatmap-task-square"
-            :style="{ backgroundColor: getTaskColor(task) }"
-            :title="`${task.title} - ${task.effort || 0}ч`"
-          ></div>
-          <div v-if="!block.tasks?.length" class="heatmap-no-tasks">
-            <span>⚪</span>
-          </div>
-        </div>
+      </template>
+      <div v-else class="no-tasks">
+        Нет задач
       </div>
     </div>
   </div>
 </div>
-
+  </div>
+</div>
 
       <!-- Контейнер с прокруткой для блоков -->
      <div 
@@ -921,10 +925,9 @@ const dateInput = ref(null)
 // ==========================================
 // ТЕПЛОВАЯ ШКАЛА И ДИЗАЙН
 // ==========================================
-
 const getBlockBackgroundColor = (block) => {
   if (!block.tasks || block.tasks.length === 0) {
-    return '#f3f4f6' // серый - нет задач
+    return '#94a3b8' // серый - нет задач
   }
   
   const hasProgressTasks = block.tasks.some(task => task.status === 'progress')
@@ -932,14 +935,13 @@ const getBlockBackgroundColor = (block) => {
   const allTasksDone = block.tasks.every(task => task.status === 'done')
   
   if (allTasksDone) {
-    return '#dcfce7' // зеленый - все задачи выполнены
+    return '#22c55e' // зеленый - все задачи выполнены
   } else if (hasProgressTasks || hasDoneTasks) {
-    return '#dbeafe' // синий - есть задачи в работе ИЛИ есть выполненные
+    return '#3b82f6' // синий - есть задачи в работе ИЛИ есть выполненные
   } else {
-    return '#f3f4f6' // серый - только не начатые задачи
+    return '#94a3b8' // серый - только не начатые задачи
   }
 }
-
 const getBlockAccentColor = (block) => {
    // Верхняя полоска остается от трудозатрат
   return getEffortColor(block.effort, 1)
@@ -1013,13 +1015,15 @@ const getBlockMinHeight = (block) => {
 // УПРАВЛЕНИЕ ЗАДАЧАМИ
 // ==========================================
 
+ 
 // Добавить задачу в блок
 const addTask = async (block) => {
   const newTask = {
     id: Date.now() + '-' + Math.random().toString(36).substr(2, 9),
     title: 'Новая задача',
-    status: 'todo',  // по умолчанию 'не начато'
+    status: 'todo',
     order: block.tasks ? block.tasks.length : 0
+    // поле effort больше не нужно
   }
   
   const updatedTasks = block.tasks ? [...block.tasks, newTask] : [newTask]
@@ -1040,7 +1044,6 @@ const addTask = async (block) => {
     showNotificationMessage('❌ Ошибка добавления', 'error')
   }
 }
-
 // Переключить статус задачи
 const toggleTask = async (block, task, event) => {
   event.stopPropagation()
@@ -1723,12 +1726,15 @@ const deleteBlock = async () => {
     console.error('Ошибка удаления:', error)
   }
 }
-
 const setViewMode = (mode) => {
   // Проверяем, что режим допустим
-  const validModes = ['horizontal', 'quarters', 'heatmap']
-  if (!validModes.includes(mode)) return
+  const validModes = ['horizontal', 'quarters', 'heatmap'] // добавьте 'months' если нужно
+  if (!validModes.includes(mode)) {
+    console.warn(`Режим "${mode}" не поддерживается`)
+    return
+  }
   
+  console.log('Переключение на режим:', mode) // для отладки
   viewMode.value = mode
   localStorage.setItem('roadmap-view-mode', mode)
   
@@ -1775,7 +1781,12 @@ watch(viewMode, () => {
 })
 
 onMounted(() => {
-  axios.post(`${API_URL}/init`).then(() => loadBlocks())
+  axios.post(`${API_URL}/init`).then(() => {
+    loadBlocks().then(() => {
+      // migrateExistingTasks() - больше не нужна
+      updateAllPositions()
+    })
+  })
   setInterval(() => {
     currentQuote.value = quotes[Math.floor(Math.random() * quotes.length)]
   }, 10000)
@@ -2616,7 +2627,7 @@ const getBlockStyle = (block) => {
 // ==========================================
 // ТЕПЛОВАЯ КАРТА - ВЫЧИСЛЯЕМЫЕ СВОЙСТВА
 // ==========================================
-
+const heatmapArea = ref(null)
 // Общая сумма трудозатрат
 const totalEffort = computed(() => {
   if (!blocks.value || !Array.isArray(blocks.value)) return 0
@@ -2639,197 +2650,518 @@ const completedEffortPercent = computed(() => {
   return Math.round((completedEffort.value / totalEffort.value) * 100)
 })
 
+// Индекс рынка (средний прогресс)
+const marketIndex = computed(() => {
+  if (totalEffort.value === 0) return 0
+  return Math.round((completedEffort.value / totalEffort.value) * 100)
+})
+
 // Блоки, отсортированные по трудозатратам (для тепловой карты)
 const sortedByEffort = computed(() => {
   if (!blocks.value || !Array.isArray(blocks.value)) return []
   return [...blocks.value].sort((a, b) => (b.effort || 0) - (a.effort || 0))
 })
-
-
-// Функция для расчета прямоугольников с точным заполнением
-const getRectangleStyle = (block) => {
-  const effort = block.effort || 0
-  const total = totalEffort.value
-  
-  if (total === 0) return {}
-  
-  // Процент от общих трудозатрат
-  const percent = (effort / total) * 100
-  
-  // Используем CSS Grid для точного позиционирования
-  // Здесь мы не задаем фиксированные размеры,
-  // а полагаемся на CSS Grid в родительском контейнере
-  
-  return {
-    backgroundColor: getHeatColor(effort),
-    border: '1px solid rgba(255,255,255,0.3)',
-    padding: '8px',
-    display: 'flex',
-    flexDirection: 'column',
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-    color: 'white',
-    textShadow: '0 1px 2px rgba(0,0,0,0.3)',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-    // Минимальные размеры для читаемости
-    minWidth: '120px',
-    minHeight: '120px',
-    // Автоматическое масштабирование
-    flex: `1 1 ${percent}%`
+// Генерация тикера для задачи (первые буквы)
+const getTaskTicker = (task) => {
+  if (!task || !task.title) return '???'
+  const words = task.title.split(' ')
+  if (words.length === 1) {
+    return task.title.substring(0, 4).toUpperCase()
   }
+  return words.map(w => w[0]).join('').toUpperCase().substring(0, 4)
 }
 
-// Функция для расчета стиля блока на основе процента трудозатрат
-const getBlockAreaStyle = (block) => {
-  const effort = block.effort || 0
-  const total = totalEffort.value
-  
-  if (total === 0) return {}
-  
-  // Процент от общих трудозатрат
-  const percent = (effort / total) * 100
-  
-  // Конвертируем процент в площадь для Grid
-  // Используем grid-area с span
-  
-  return {
-    backgroundColor: getHeatColor(effort),
-    border: '1px solid rgba(255,255,255,0.3)',
-    padding: '8px',
-    display: 'flex',
-    flexDirection: 'column',
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-    color: 'white',
-    textShadow: '0 1px 2px rgba(0,0,0,0.3)',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-    // Блок будет занимать площадь пропорционально проценту
-    // Это будет обработано через CSS Grid в родителе
+// Изменение в процентах (прогресс задачи)
+const getTaskChange = (task) => {
+  if (!task) return '0%'
+  const statusProgress = {
+    'done': '+100%',
+    'progress': '+50%',
+    'todo': '0%'
   }
+  return statusProgress[task.status] || '0%'
 }
 
-// Функция для расчета позиции блока в сетке
-// Функция для расчета позиции блока в сетке (квадратные блоки)
-const getBlockPosition = (block, index, allBlocks) => {
-  const effort = block.effort || 0
-  const total = totalEffort.value
-  
-  if (total === 0) return {}
-  
-  // Процент от общих трудозатрат
-  const percent = (effort / total) * 100
-  
-  // Конвертируем процент в количество ячеек сетки (100x100 = 10000 ячеек)
-  const totalCells = 10000
-  const blockCells = Math.max(50, Math.floor((percent / 100) * totalCells))
-  
-  // Делаем блок квадратным - одинаковые ширина и высота
-  const blockSize = Math.max(3, Math.min(30, Math.floor(Math.sqrt(blockCells))))
-  
-  return {
-    '--width': blockSize,
-    '--height': blockSize
-  }
-}
-// Более сложный алгоритм для идеального заполнения
-const calculateBlockPositions = (blocks) => {
-  if (!blocks.length) return []
-  
-  const total = totalEffort.value
-  const grid = [] // 2D массив для отслеживания занятых ячеек
-  const positions = []
-  
-  // Инициализируем сетку 100x100
-  for (let i = 0; i < 100; i++) {
-    grid[i] = Array(100).fill(false)
-  }
-  
-  // Сортируем блоки по убыванию (самые большие первыми)
-  const sortedBlocks = [...blocks].sort((a, b) => (b.effort || 0) - (a.effort || 0))
-  
-  sortedBlocks.forEach(block => {
-    const effort = block.effort || 0
-    const percent = (effort / total) * 100
-    const targetCells = Math.round((percent / 100) * 10000)
-    
-    // Ищем оптимальный размер блока
-    let bestSize = { cols: 1, rows: 1 }
-    let bestDiff = Infinity
-    
-    for (let cols = 1; cols <= 50; cols++) {
-      for (let rows = 1; rows <= 50; rows++) {
-        const cells = cols * rows
-        const diff = Math.abs(cells - targetCells)
-        if (diff < bestDiff) {
-          bestDiff = diff
-          bestSize = { cols, rows }
-        }
-      }
-    }
-    
-    // Ищем свободное место для блока
-    let placed = false
-    for (let row = 0; row < 100 - bestSize.rows + 1 && !placed; row++) {
-      for (let col = 0; col < 100 - bestSize.cols + 1 && !placed; col++) {
-        // Проверяем, свободны ли все ячейки
-        let free = true
-        for (let r = 0; r < bestSize.rows && free; r++) {
-          for (let c = 0; c < bestSize.cols && free; c++) {
-            if (grid[row + r][col + c]) free = false
-          }
-        }
-        
-        if (free) {
-          // Занимаем ячейки
-          for (let r = 0; r < bestSize.rows; r++) {
-            for (let c = 0; c < bestSize.cols; c++) {
-              grid[row + r][col + c] = true
-            }
-          }
-          
-          positions.push({
-            block,
-            col,
-            row,
-            cols: bestSize.cols,
-            rows: bestSize.rows
-          })
-          placed = true
-        }
-      }
-    }
-  })
-  
-  return positions
-}
-
-// Цвет задачи в зависимости от статуса
-const getTaskColor = (task) => {
-  switch(task.status) {
-    case 'done': return '#22c55e' // зеленый - выполнено
-    case 'progress': return '#eab308' // желтый - в работе
-    case 'todo': return '#94a3b8' // серый - не начато
-    default: return '#94a3b8'
-  }
-}
-
-// Размер блока в зависимости от трудозатрат
-const getBlockGridStyle = (block) => {
+// Стиль сектора (этапа)
+const getSectorStyle = (block) => {
   const effort = block.effort || 0
   const maxEffort = Math.max(...blocks.value.map(b => b.effort || 0), 1)
   
-  // Размер от 150px до 350px
-  const minSize = 150
-  const maxSize = 350
+  // Размер сектора от 300px до 600px
+  const minSize = 300
+  const maxSize = 600
   const size = minSize + (effort / maxEffort) * (maxSize - minSize)
   
   return {
     width: size + 'px',
-    height: size + 'px',
-    backgroundColor: getEffortColor(effort, 0.9),
-    border: '1px solid rgba(255,255,255,0.3)',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+    backgroundColor: '#ffffff',
+    border: '1px solid #e2e8f0',
+    borderRadius: '8px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+    padding: '16px'
   }
+}
+
+// Стиль для акции (задачи)
+const getStockStyle = (task, block) => {
+  if (!task || !block) return {}
+  
+  const taskEffort = task.effort || 0
+  const blockEffort = block.effort || 1
+  
+  // Процент от общего объема сектора
+  const percentOfSector = (taskEffort / blockEffort) * 100
+  
+  // Размер акции пропорционален объему
+  const sizeFactor = Math.sqrt(percentOfSector) * 8
+  const minSize = 40
+  const maxSize = 120
+  const size = Math.min(maxSize, Math.max(minSize, sizeFactor))
+  
+  // Цвет акции в зависимости от статуса
+  const getStockColor = (status) => {
+    const colors = {
+      'done': '#22c55e',
+      'progress': '#eab308',
+      'todo': '#ef4444'
+    }
+    return colors[status] || '#94a3b8'
+  }
+  
+  return {
+    width: size + 'px',
+    height: size + 'px',
+    backgroundColor: getStockColor(task.status),
+    backgroundImage: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 100%)',
+    borderRadius: '6px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: 'white',
+    fontSize: size > 60 ? '0.8rem' : '0.6rem',
+    fontWeight: 'bold',
+    textShadow: '0 1px 2px rgba(0,0,0,0.3)',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+    transition: 'all 0.2s',
+    cursor: 'pointer',
+    padding: '2px'
+  }
+}
+// Состояние для хранения позиций блоков
+const positionBlocks = ref([])
+
+// Функция для расчета позиций блоков (алгоритм Squarified Treemap)
+const calculateBlockPositions = () => {
+  if (!blocks.value.length || totalEffort.value === 0) return []
+  
+  // Сортируем блоки по убыванию трудозатрат
+  const sorted = [...blocks.value].sort((a, b) => (b.effort || 0) - (a.effort || 0))
+  
+  // Размеры области
+  const areaWidth = 1000
+  const areaHeight = 400
+  const totalArea = areaWidth * areaHeight
+  
+  // Массив для хранения результатов
+  const result = []
+  
+  // Начинаем с корневой области
+  const stack = [{
+    x: 0,
+    y: 0,
+    width: areaWidth,
+    height: areaHeight,
+    blocks: sorted.map(b => ({ ...b, effort: b.effort || 0 }))
+  }]
+  
+  while (stack.length > 0) {
+    const current = stack.pop()
+    const { x, y, width, height, blocks } = current
+    
+    if (blocks.length === 0) continue
+    
+    // Если остался один блок - занимает всю область
+    if (blocks.length === 1) {
+      result.push({
+        ...blocks[0],
+        x, y, width, height
+      })
+      continue
+    }
+    
+    // Вычисляем суммарные трудозатраты оставшихся блоков
+    const totalEffortInArea = blocks.reduce((sum, b) => sum + b.effort, 0)
+    
+    // Определяем, как делить (горизонтально или вертикально)
+    const isHorizontal = width >= height
+    
+    // Находим точку разделения
+    let splitIndex = 1
+    let sum1 = blocks[0].effort
+    let sum2 = totalEffortInArea - sum1
+    let bestRatio = Math.abs(sum1 / totalEffortInArea - 0.5)
+    
+    for (let i = 2; i < blocks.length; i++) {
+      sum1 += blocks[i-1].effort
+      sum2 = totalEffortInArea - sum1
+      const ratio = Math.abs(sum1 / totalEffortInArea - 0.5)
+      if (ratio < bestRatio) {
+        bestRatio = ratio
+        splitIndex = i
+      }
+    }
+    
+    const blocks1 = blocks.slice(0, splitIndex)
+    const blocks2 = blocks.slice(splitIndex)
+    
+    const sum1Effort = blocks1.reduce((sum, b) => sum + b.effort, 0)
+    const sum2Effort = blocks2.reduce((sum, b) => sum + b.effort, 0)
+    
+    if (isHorizontal) {
+      // Делим по горизонтали
+      const splitX = x + (width * sum1Effort / totalEffortInArea)
+      
+      stack.push({
+        x, y,
+        width: splitX - x,
+        height,
+        blocks: blocks1
+      })
+      
+      stack.push({
+        x: splitX, y,
+        width: x + width - splitX,
+        height,
+        blocks: blocks2
+      })
+    } else {
+      // Делим по вертикали
+      const splitY = y + (height * sum1Effort / totalEffortInArea)
+      
+      stack.push({
+        x, y,
+        width,
+        height: splitY - y,
+        blocks: blocks1
+      })
+      
+      stack.push({
+        x, y: splitY,
+        width,
+        height: y + height - splitY,
+        blocks: blocks2
+      })
+    }
+  }
+  
+  return result
+}
+
+// Стиль для позиционированного блока
+const getPositionedBlockStyle = (block) => {
+  return {
+    position: 'absolute',
+    left: block.x + 'px',
+    top: block.y + 'px',
+    width: block.width + 'px',
+    height: block.height + 'px',
+    backgroundColor: getBlockBackgroundColor(block),
+    border: '1px solid rgba(0,0,0,0.1)',
+    boxSizing: 'border-box',
+    padding: '8px',
+    overflow: 'hidden',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    display: 'flex',
+    flexDirection: 'column'
+  }
+}
+
+// Обновляем позиции при изменении блоков
+watch([blocks], () => {
+  positionBlocks.value = calculateBlockPositions()
+}, { deep: true, immediate: true })
+// Состояние для хранения позиций этапов и задач
+const stagePositions = ref([])
+const taskPositions = ref({})
+
+ 
+// Функция для расчета treemap (общий алгоритм)
+const calculateTreemap = (items, totalValue, x, y, width, height) => {
+  if (!items.length) return []
+  
+  // Копируем и сортируем по убыванию
+  const sorted = [...items].sort((a, b) => (b.value || 0) - (a.value || 0))
+  const result = []
+  
+  // Рекурсивная функция разделения
+  const split = (items, x, y, width, height) => {
+    if (items.length === 0) return
+    
+    if (items.length === 1) {
+  // Убеждаемся, что даже очень маленькие задачи имеют минимальный размер для видимости
+  const minVisibleSize = 1
+  result.push({
+    ...items[0],
+    x: Math.round(x),
+    y: Math.round(y),
+    width: Math.max(minVisibleSize, Math.round(width)),
+    height: Math.max(minVisibleSize, Math.round(height))
+  })
+  return
+    }
+    
+    // Вычисляем суммарное значение
+    const total = items.reduce((sum, item) => sum + (item.value || 0), 0)
+    
+    // Определяем направление разделения
+    const isHorizontal = width >= height
+    
+    // Находим оптимальное разделение
+    let splitIndex = 1
+    let sum1 = items[0].value
+    let sum2 = total - sum1
+    let bestRatio = Math.abs(sum1 / total - 0.5)
+    
+    for (let i = 2; i < items.length; i++) {
+      sum1 += items[i-1].value
+      sum2 = total - sum1
+      const ratio = Math.abs(sum1 / total - 0.5)
+      if (ratio < bestRatio) {
+        bestRatio = ratio
+        splitIndex = i
+      }
+    }
+    
+    const items1 = items.slice(0, splitIndex)
+    const items2 = items.slice(splitIndex)
+    
+    const sum1Value = items1.reduce((sum, item) => sum + (item.value || 0), 0)
+    
+    if (isHorizontal) {
+      // Делим по горизонтали
+      const splitX = x + Math.round(width * sum1Value / total)
+      split(items1, x, y, splitX - x, height)
+      split(items2, splitX, y, x + width - splitX, height)
+    } else {
+      // Делим по вертикали
+      const splitY = y + Math.round(height * sum1Value / total)
+      split(items1, x, y, width, splitY - y)
+      split(items2, x, splitY, width, y + height - splitY)
+    }
+  }
+  
+  split(sorted, x, y, width, height)
+  return result
+}
+
+// Расчет позиций для этапов
+const calculateStagePositions = () => {
+  if (!blocks.value.length || totalEffort.value === 0) return []
+  
+  const stages = blocks.value.map(block => ({
+    id: block.id,
+    title: block.title,
+    effort: block.effort || 0,
+    value: block.effort || 0,
+    releaseDate: block.releaseDate,
+    // НЕ передаем tasks сюда, чтобы не мешали расчету
+  }))
+  
+  return calculateTreemap(
+    stages, 
+    totalEffort.value, 
+    0, 0, 
+    TREEMAP_WIDTH, 
+    TREEMAP_HEIGHT
+  )
+}
+
+
+ 
+// Расчет позиций для задач внутри этапа
+const calculateTaskPositionsForStage = (stageWithTasks) => {
+  if (!stageWithTasks.tasks || stageWithTasks.tasks.length === 0) {
+    console.log(`Stage ${stageWithTasks.title} has no tasks`)
+    return []
+  }
+  
+  // Каждая задача имеет вес 1
+  const tasks = stageWithTasks.tasks.map((task, index) => ({
+    id: task.id,
+    title: task.title,
+    status: task.status,
+    value: 1, // каждая задача весит 1
+    index: index
+  }))
+  
+  const totalValue = tasks.length
+  console.log(`Stage ${stageWithTasks.title} has ${totalValue} tasks, each weight=1`)
+  
+  // Находим позицию этапа по ID
+  const stagePos = stagePositions.value.find(s => s.id === stageWithTasks.id)
+  if (!stagePos) {
+    console.log(`Stage position not found for ${stageWithTasks.title}`)
+    return []
+  }
+  
+  console.log(`Stage position for ${stageWithTasks.title}:`, {
+    width: stagePos.width,
+    height: stagePos.height
+  })
+  
+  // Рассчитываем treemap для задач внутри этапа
+  const taskPositions = calculateTreemap(
+    tasks,
+    totalValue,
+    0, 0,
+    stagePos.width,
+    stagePos.height
+  )
+  
+  console.log(`Task positions for ${stageWithTasks.title}:`, taskPositions.length)
+  return taskPositions
+}
+ 
+ 
+// Обновление всех позиций
+// Добавьте временно в updateAllPositions
+const updateAllPositions = () => {
+  console.log('Updating positions...')
+  
+  stagePositions.value = calculateStagePositions()
+  console.log('Stage positions:', stagePositions.value.map(s => ({
+    title: s.title,
+    width: s.width,
+    height: s.height,
+    area: s.width * s.height
+  })))
+  
+  const taskMap = {}
+  stagePositions.value.forEach(stage => {
+    const originalBlock = blocks.value.find(b => b.id === stage.id)
+    if (originalBlock) {
+      const tasks = calculateTaskPositionsForStage({
+        ...stage,
+        tasks: originalBlock.tasks || []
+      })
+      
+      // Проверяем, все ли задачи поместились
+      if (tasks.length !== originalBlock.tasks?.length) {
+        console.warn(`Stage ${stage.title}: only ${tasks.length}/${originalBlock.tasks?.length} tasks fit`)
+      }
+      
+      taskMap[stage.id] = tasks
+    } else {
+      taskMap[stage.id] = []
+    }
+  })
+  taskPositions.value = taskMap
+}
+// Следим за изменениями
+watch([blocks], () => {
+  updateAllPositions()
+}, { deep: true, immediate: true })
+
+// Константы размеров
+const TREEMAP_WIDTH = 1300
+const TREEMAP_HEIGHT = 400
+// Стиль для блока этапа
+// Стиль для блока этапа
+const getStageStyle = (stage) => {
+  // Получаем оригинальный блок для определения статуса
+  const originalBlock = blocks.value.find(b => b.id === stage.id)
+  
+  return {
+    position: 'absolute',
+    left: stage.x + 'px',
+    top: stage.y + 'px',
+    width: stage.width + 'px',
+    height: stage.height + 'px',
+    backgroundColor: originalBlock ? getBlockBackgroundColor(originalBlock) : '#f3f4f6',
+    border: '1px solid rgba(0,0,0,0.1)',
+    boxSizing: 'border-box',
+    padding: '6px',
+    overflow: 'hidden',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    display: 'flex',
+    flexDirection: 'column',
+    borderRadius: '4px',
+    boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.5)'
+  }
+}
+ 
+// Стиль для задачи внутри этапа
+const getTaskStyle = (task) => {
+  const colors = {
+    'done': '#22c55e',    // зеленая - выполнена
+    'progress': '#3b82f6', // синий - в работе
+    'todo': '#94a3b8'      // серая - не начата
+  }
+  
+  // Минимальный размер для видимости
+  const minSize = 4
+  const width = Math.max(minSize, task.width)
+  const height = Math.max(minSize, task.height)
+  
+  return {
+    position: 'absolute',
+    left: task.x + 'px',
+    top: task.y + 'px',
+    width: width + 'px',
+    height: height + 'px',
+    backgroundColor: colors[task.status] || '#94a3b8',
+    border: '1px solid rgba(255,255,255,0.3)',
+    boxSizing: 'border-box',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: 'white',
+    fontSize: width > 20 ? '8px' : '0px',
+    fontWeight: 'bold',
+    borderRadius: '2px',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    zIndex: 10
+  }
+}
+
+ 
+// Получение инициалов задачи
+const getTaskInitials = (title) => {
+  if (!title) return '?'
+  
+  // Берем первые буквы слов
+  const words = title.split(' ')
+  if (words.length === 1) {
+    return title.substring(0, 2).toUpperCase()
+  }
+  return words.slice(0, 2).map(w => w[0]).join('').toUpperCase()
+}
+// Короткий формат даты
+const formatShortDate = (dateStr) => {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  return `${date.getDate()}.${date.getMonth() + 1}`
+}
+
+// Получить оригинальный блок по ID
+const getOriginalBlock = (stageId) => {
+  return blocks.value.find(b => b.id === stageId)
+}
+
+// Редактировать задачу из treemap
+const editTaskFromStage = (stageId, taskId) => {
+  const block = getOriginalBlock(stageId)
+  if (!block) return
+  
+  const task = block.tasks?.find(t => t.id === taskId)
+  if (!task) return
+  
+  // Запускаем редактирование задачи
+  startTaskEdit(block, task, event)
 }
 </script>
 
@@ -4180,7 +4512,7 @@ const getBlockGridStyle = (block) => {
     justify-content: flex-end;
   }
 }
-/* ========== ТЕПЛОВАЯ КАРТА - БЛОКИ С ЗАДАЧАМИ ========== */
+/* ========== ТЕПЛОВАЯ КАРТА ========== */
 .heatmap-view {
   flex: 1;
   display: flex;
@@ -4190,6 +4522,7 @@ const getBlockGridStyle = (block) => {
   background: #f8fafc;
 }
 
+/* ШАПКА ТЕПЛОВОЙ КАРТЫ */
 .heatmap-header {
   display: flex;
   justify-content: space-between;
@@ -4199,7 +4532,9 @@ const getBlockGridStyle = (block) => {
   gap: 16px;
   background: white;
   padding: 16px 20px;
-  border: 0px solid #e2e8f0;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.02);
 }
 
 .heatmap-title-section h2 {
@@ -4209,6 +4544,7 @@ const getBlockGridStyle = (block) => {
   margin: 0 0 12px 0;
 }
 
+/* ЛЕГЕНДА */
 .heatmap-legend {
   display: flex;
   gap: 24px;
@@ -4227,11 +4563,13 @@ const getBlockGridStyle = (block) => {
   width: 20px;
   height: 20px;
   border-radius: 4px;
+  border: 1px solid #e2e8f0;
 }
 
+/* СТАТИСТИКА */
 .heatmap-stats {
   display: flex;
-  gap: 24px;
+  gap: 16px;
   flex-wrap: wrap;
 }
 
@@ -4239,135 +4577,508 @@ const getBlockGridStyle = (block) => {
   display: flex;
   align-items: center;
   gap: 8px;
+  background: #f1f5f9;
+  padding: 6px 14px;
+  border-radius: 30px;
 }
 
 .heatmap-stat .stat-icon {
-  font-size: 1.1rem;
+  font-size: 1rem;
+  color: #475569;
 }
 
 .heatmap-stat .stat-label {
   color: #64748b;
   font-weight: 500;
-  font-size: 0.9rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
 .heatmap-stat .stat-value {
   font-weight: 600;
   color: #0f172a;
-  background: #f1f5f9;
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 0.9rem;
+  background: white;
+  padding: 2px 10px;
+  border-radius: 30px;
+  font-size: 0.8rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 
+/* КОНТЕЙНЕР ДЛЯ ОБЛАСТИ */
 .heatmap-container {
   flex: 1;
-  overflow: auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   padding: 20px;
   background: white;
   border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.02);
 }
 
-/* СЕТКА для блоков */
-.heatmap-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5x;
-  justify-content: flex-start;
-  align-items: flex-start;
-}
-
-.heatmap-block {
-  border-radius: 0px;
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  color: white;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+/* ОБЛАСТЬ ФИКСИРОВАННОГО РАЗМЕРА */
+.heatmap-area {
   position: relative;
+  width: 1000px;
+  height: 400px;
+  background: #f1f5f9;
+  border: 2px solid #f1f5f9;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+  border-radius: 0px;
   overflow: hidden;
 }
 
-.heatmap-block:hover {
-  transform: translateY(-4px) scale(1.02);
-  box-shadow: 0 12px 24px rgba(0,0,0,0.2);
-  z-index: 10;
+/* БЛОКИ ЭТАПОВ */
+.heatmap-stage-block {
+  position: absolute;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  box-sizing: border-box;
+  border: 1px solid rgba(255,255,255,0.3);
+  overflow: hidden;
 }
 
-.heatmap-block-header {
-  margin-bottom: 12px;
+.heatmap-stage-block:hover {
+  opacity: 0.9;
+  box-shadow: inset 0 0 0 2px white, 0 8px 20px rgba(0,0,0,0.2);
+  z-index: 20;
+  transform: scale(1.01);
 }
 
-.heatmap-block-title {
+/* СОДЕРЖИМОЕ БЛОКА */
+.stage-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  color: #0f172a;
+  padding: 6px;
+}
+
+.stage-title {
   font-weight: 600;
-  font-size: 1rem;
-  margin-bottom: 4px;
+  font-size: 0.9rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  margin-bottom: 2px;
+  color: #0f172a;
 }
 
-.heatmap-block-effort {
-  font-size: 0.9rem;
-  font-weight: 500;
-  background: rgba(0,0,0,0.2);
-  padding: 2px 8px;
-  border-radius: 20px;
+.stage-effort {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #3b82f6;
+  background: rgba(255,255,255,0.5);
   display: inline-block;
+  padding: 2px 6px;
+  border-radius: 12px;
+  align-self: flex-start;
+  margin-bottom: 2px;
 }
 
-/* Сетка задач */
-.heatmap-tasks-grid {
+.stage-percent {
+  font-size: 0.7rem;
+  color: #64748b;
+  margin-top: auto;
+  align-self: flex-end;
+}
+
+/* СТАРЫЕ СТИЛИ (stock) - ОСТАВЛЯЕМ ДЛЯ СОВМЕСТИМОСТИ */
+.stock-heatmap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  justify-content: center;
+  align-items: flex-start;
+  background: transparent;
+}
+
+.stock-sector {
+  transition: all 0.3s ease;
+  cursor: pointer;
+  position: relative;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: white;
+}
+
+.stock-sector:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+  border-color: #3b82f6 !important;
+}
+
+.sector-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.sector-name {
+  font-weight: 600;
+  font-size: 1rem;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 70%;
+}
+
+.sector-value {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #3b82f6;
+  background: #eff6ff;
+  padding: 4px 10px;
+  border-radius: 30px;
+}
+
+.stocks-grid {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: auto;
-  max-height: 60%;
-  overflow-y: auto;
-  padding: 4px;
-  background: rgba(0,0,0,0.1);
+  min-height: 150px;
+  background: #f8fafc;
   border-radius: 8px;
+  padding: 10px;
+  align-content: flex-start;
 }
 
-.heatmap-task-square {
-  width: 24px;
-  height: 24px;
-  border-radius: 4px;
+.stock-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   transition: all 0.2s;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 4px;
 }
 
-.heatmap-task-square:hover {
-  transform: scale(1.2);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+.stock-item:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  z-index: 10;
+  border-color: white;
 }
 
-.heatmap-no-tasks {
+.stock-ticker {
+  font-weight: 700;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  font-size: 0.7rem;
+}
+
+.stock-change {
+  font-size: 0.5rem;
+  color: rgba(255,255,255,0.9);
+  background: rgba(0,0,0,0.2);
+  padding: 2px 4px;
+  border-radius: 4px;
+  margin-top: 2px;
+}
+
+.no-stocks {
   width: 100%;
   text-align: center;
-  padding: 8px;
-  color: rgba(255,255,255,0.7);
+  padding: 20px;
+  color: #94a3b8;
+  font-style: italic;
   font-size: 0.8rem;
 }
 
-/* Адаптивность */
-@media (max-width: 768px) {
-  .heatmap-grid {
-    justify-content: center;
-  }
-  
-  .heatmap-block {
-    width: 100% !important;
-    height: auto !important;
-    min-height: 200px;
-  }
-  
-  .heatmap-task-square {
-    width: 20px;
-    height: 20px;
+/* АДАПТИВНОСТЬ ДЛЯ МАЛЕНЬКИХ БЛОКОВ */
+.heatmap-stage-block[style*="width: 50px"] .stage-title,
+.heatmap-stage-block[style*="width: 60px"] .stage-title,
+.heatmap-stage-block[style*="width: 70px"] .stage-title,
+.heatmap-stage-block[style*="width: 80px"] .stage-title {
+  font-size: 0.7rem;
+  white-space: normal;
+  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.heatmap-stage-block[style*="height: 30px"] .stage-content,
+.heatmap-stage-block[style*="height: 40px"] .stage-content {
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.heatmap-stage-block[style*="height: 30px"] .stage-percent,
+.heatmap-stage-block[style*="height: 40px"] .stage-percent {
+  margin-top: 0;
+  margin-left: auto;
+}
+
+.heatmap-stage-block[style*="height: 30px"] .stage-effort,
+.heatmap-stage-block[style*="height: 40px"] .stage-effort {
+  font-size: 0.7rem;
+  padding: 1px 4px;
+}
+
+/* АДАПТИВНОСТЬ ДЛЯ ЭКРАНОВ */
+@media (max-width: 1200px) {
+  .heatmap-area {
+    width: 800px;
+    height: 320px;
   }
 }
 
+@media (max-width: 900px) {
+  .heatmap-area {
+    width: 600px;
+    height: 240px;
+  }
+}
+
+@media (max-width: 768px) {
+  .heatmap-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .heatmap-stats {
+    width: 100%;
+    justify-content: space-around;
+  }
+  
+  .heatmap-area {
+    width: 100%;
+    height: 400px;
+  }
+  
+  .stock-sector {
+    width: 100% !important;
+  }
+  
+  .stock-item {
+    width: 35px !important;
+    height: 35px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .heatmap-legend {
+    gap: 12px;
+  }
+  
+  .heatmap-stat {
+    padding: 4px 10px;
+  }
+  
+  .heatmap-area {
+    height: 300px;
+  }
+}
+/* TREEMAP ОБЛАСТЬ */
+.treemap-area {
+ position: relative;
+  width: 90vw;      /* 80% ширины окна */
+  max-width: 1300px; /* максимум 1300px */
+  min-width: 600px;  /* минимум 600px */
+  height: 60vh;      /* 25% высоты окна */
+  min-height: 300px; /* минимум 300px */
+  max-height: 400px; /* максимум 400px */
+  background: #f1f5f9;
+  border: 2px solid #c5cfde;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+  border-radius: 0px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+/* БЛОК ЭТАПА */
+.treemap-stage {
+  position: absolute;
+  transition: all 0.2s;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.treemap-stage:hover {
+  opacity: 0.95;
+  box-shadow: inset 0 0 0 2px white, 0 4px 12px rgba(0,0,0,0.2);
+  z-index: 20;
+}
+
+/* ШАПКА ЭТАПА */
+/* ШАПКА ЭТАПА */
+.stage-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+  padding: 2px 4px;
+  background: rgba(255,255,255,0.7);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  backdrop-filter: blur(2px);
+  border: 1px solid rgba(255,255,255,0.5);
+}
+
+.stage-title {
+  font-weight: 700;
+  color: #0f172a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 60%;
+}
+
+.stage-metrics {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+  flex-shrink: 0;
+  font-family: inherit;
+}
+
+.stage-effort {
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 0.8rem;
+}
+
+.stage-progress {
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 0.8rem;
+}
+
+.stage-date {
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 0.8rem;
+}
+
+/* Адаптивность для маленьких блоков */
+.treemap-stage[style*="height: 50px"] .stage-header,
+.treemap-stage[style*="height: 60px"] .stage-header,
+.treemap-stage[style*="height: 70px"] .stage-header,
+.treemap-stage[style*="height: 80px"] .stage-header {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 2px;
+}
+
+.treemap-stage[style*="height: 50px"] .stage-metrics,
+.treemap-stage[style*="height: 60px"] .stage-metrics,
+.treemap-stage[style*="height: 70px"] .stage-metrics,
+.treemap-stage[style*="height: 80px"] .stage-metrics {
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.treemap-stage[style*="height: 50px"] .stage-effort,
+.treemap-stage[style*="height: 50px"] .stage-progress,
+.treemap-stage[style*="height: 50px"] .stage-date {
+  font-size: 0.7rem;
+}
+
+/* Для очень маленьких блоков - только название и часы */
+.treemap-stage[style*="height: 30px"] .stage-progress,
+.treemap-stage[style*="height: 30px"] .stage-date,
+.treemap-stage[style*="height: 40px"] .stage-progress,
+.treemap-stage[style*="height: 40px"] .stage-date {
+  display: none;
+}
+
+.treemap-stage[style*="height: 30px"] .stage-effort,
+.treemap-stage[style*="height: 40px"] .stage-effort {
+  font-size: 0.7rem;
+}
+/* ОБЛАСТЬ ЗАДАЧ */
+.tasks-area {
+  position: relative;
+  width: 100%;
+  height: calc(100% - 24px); /* высота минус шапка */
+  background: rgba(255,255,255,0.2);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+/* ЗАДАЧА */
+.treemap-task {
+  transition: all 0.2s;
+  z-index: 10;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.treemap-task:hover {
+  transform: scale(1.1);
+  box-shadow: 0 0 0 2px white, 0 4px 8px rgba(0,0,0,0.3);
+  z-index: 30;
+  border-radius: 4px !important;
+}
+
+.task-label {
+  color: white;
+  font-weight: bold;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  font-size: 0.6rem;
+}
+
+.no-tasks {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #94a3b8;
+  font-style: italic;
+  font-size: 0.7rem;
+}
+/* Полный адаптивный набор */
+@media screen and (min-width: 2000px) { .treemap-area { width: 1600px; height: 500px; } }
+@media screen and (max-width: 1800px) { .treemap-area { width: 1300px; height: 400px; } }
+@media screen and (max-width: 1500px) { .treemap-area { width: 1200px; height: 370px; } }
+@media screen and (max-width: 1350px) { .treemap-area { width: 1100px; height: 340px; } }
+@media screen and (max-width: 1200px) { .treemap-area { width: 1000px; height: 310px; } }
+@media screen and (max-width: 1050px) { .treemap-area { width: 900px; height: 280px; } }
+@media screen and (max-width: 950px) { .treemap-area { width: 800px; height: 250px; } }
+@media screen and (max-width: 850px) { .treemap-area { width: 95%; height: 350px; } }
+@media screen and (max-width: 600px) { .treemap-area { height: 300px; } }
+@media screen and (max-width: 400px) { .treemap-area { height: 250px; } }
+
+.task-edit-input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  border: 1px solid #3b82f6;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  background: white;
+}
+
+.task-edit-save {
+  flex: 0 0 24px;
+  height: 24px;
+  border: none;
+  background: #3b82f6;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+}
+
+.task-edit-save:hover {
+  background: #2563eb;
+}
 </style>

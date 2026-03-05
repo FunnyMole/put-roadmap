@@ -1,12 +1,4 @@
-<<<<<<< HEAD
 # 🚀 Путь — роадмап релизов 2026
-=======
-![Vue](https://img.shields.io/badge/Vue-3.x-4FC08D)
-![Node](https://img.shields.io/badge/Node-18.x-339933)
-![License](https://img.shields.io/badge/license-MIT-blue)
-
-# 🚀 Путь — роадмап 2026
->>>>>>> 5684030e57cd11a915185d4194f08fff78d6eb59
 
 Приложение для планирования и отслеживания релизов с задачами, статусами и тепловой картой трудозатрат.
 
