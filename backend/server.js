@@ -65,9 +65,8 @@ const Block = sequelize.define('Block', {
   timestamps: true
 });
 
-// Синхронизируем модель с базой данных
-await sequelize.sync({ force: true }); // force: true пересоздаст таблицу
-console.log('✅ База данных пересоздана');
+// Синхронизация
+await sequelize.sync();
 
 const app = express();
 const PORT = 3001;
@@ -145,139 +144,21 @@ app.delete('/api/blocks/:id', async (req, res) => {
   }
 });
 
-// Инициализация с тестовыми данными
+// ИНИЦИАЛИЗАЦИЯ - проверка соединения с БД
 app.post('/api/init', async (req, res) => {
   try {
+    // Проверяем соединение с БД
+    await sequelize.authenticate();
+    console.log('✅ База данных готова');
+    
+    // Проверяем, есть ли записи
     const count = await Block.count();
+    console.log(`📊 В базе ${count} записей`);
     
-    if (count === 0) {
-      // Создаем тестовые блоки с уникальными ID и задачами со статусами
-      const testBlocks = [
-        {
-          title: 'Тайм-трекинг',
-          description: 'Учёт времени на задачи',
-          releaseDate: '2026-01-15',
-          effort: 80,
-          completed: false,
-          tasks: [
-            { 
-              id: 't1-1', 
-              title: 'Разработать интерфейс', 
-              status: 'done',
-              order: 0 
-            },
-            { 
-              id: 't1-2', 
-              title: 'Написать бэкенд', 
-              status: 'progress',
-              order: 1 
-            },
-            { 
-              id: 't1-3', 
-              title: 'Протестировать', 
-              status: 'todo',
-              order: 2 
-            }
-          ]
-        },
-        {
-          title: 'Диаграммы Ганта',
-          description: 'Визуализация сроков',
-          releaseDate: '2026-01-20',
-          effort: 64,
-          completed: false,
-          tasks: [
-            { 
-              id: 't2-1', 
-              title: 'Спроектировать алгоритм', 
-              status: 'done',
-              order: 0 
-            },
-            { 
-              id: 't2-2', 
-              title: 'Реализовать отрисовку', 
-              status: 'progress',
-              order: 1 
-            },
-            { 
-              id: 't2-3', 
-              title: 'Оптимизировать производительность', 
-              status: 'todo',
-              order: 2 
-            },
-            { 
-              id: 't2-4', 
-              title: 'Написать документацию', 
-              status: 'todo',
-              order: 3 
-            }
-          ]
-        },
-        {
-          title: 'AI-помощники',
-          description: 'Автоматизация рутины',
-          releaseDate: '2026-02-15',
-          effort: 80,
-          completed: false,
-          tasks: [
-            { 
-              id: 't3-1', 
-              title: 'Исследование рынка', 
-              status: 'done',
-              order: 0 
-            },
-            { 
-              id: 't3-2', 
-              title: 'Выбор модели', 
-              status: 'done',
-              order: 1 
-            },
-            { 
-              id: 't3-3', 
-              title: 'Интеграция API', 
-              status: 'progress',
-              order: 2 
-            }
-          ]
-        },
-        {
-          title: 'Отчеты по проектам',
-          description: 'Контроль отклонений от графика',
-          releaseDate: '2026-02-28',
-          effort: 48,
-          completed: false,
-          tasks: []
-        },
-        {
-          title: 'Массовая работа с задачами',
-          description: 'Редактирование сотен задач за минуты',
-          releaseDate: '2026-03-10',
-          effort: 40,
-          completed: false,
-          tasks: [
-            { 
-              id: 't5-1', 
-              title: 'UI/UX дизайн', 
-              status: 'todo',
-              order: 0 
-            }
-          ]
-        }
-      ];
-      
-      // Создаем каждый блок отдельно, чтобы гарантировать уникальные ID
-      for (const blockData of testBlocks) {
-        await Block.create(blockData);
-      }
-      
-      console.log('✅ Тестовые релизы с задачами созданы');
-      console.log('📊 Статусы задач: done (✅), progress (⏳), todo (○)');
-    }
-    
-    res.json({ message: 'Инициализация выполнена' });
+    res.json({ success: true, message: 'Инициализация завершена' });
   } catch (error) {
-    console.error('Ошибка при инициализации:', error);
-    res.status(500).json({ error: 'Ошибка сервера' });
+    console.error('❌ Ошибка инициализации:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 

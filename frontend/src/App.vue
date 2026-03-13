@@ -36,7 +36,15 @@
     @click="setViewMode('heatmap')"
   >
     🔥 Тепловая карта
-  </button>
+            </button>
+             <!-- НОВАЯ КНОПКА ДЛЯ ДИАГРАММЫ ГАНТА -->
+            <button 
+              class="btn" 
+              :class="{ active: viewMode === 'gantt' }" 
+              @click="setViewMode('gantt')"
+            >
+              📈 Диаграмма Ганта
+            </button>
         </div>
         <div class="toolbar-group">
           <button class="btn btn-primary" @click="createNewBlock">+ Новый этап</button>
@@ -47,7 +55,7 @@
       </div>
 
       <!-- Статистика сверху -->
-      <div class="statistics-top" v-if="viewMode !== 'heatmap'">
+      <div class="statistics-top" v-if="viewMode !== 'heatmap' && viewMode !== 'gantt'"">
         <div class="stat-item">
           <span class="stat-icon">📊</span>
           <span class="stat-label">Этапов:</span>
@@ -203,10 +211,136 @@
 </div>
   </div>
 </div>
+ <!-- ДИАГРАММА ГАНТА -->
 
-      <!-- Контейнер с прокруткой для блоков -->
-     <div 
- v-if="viewMode !== 'heatmap'"
+
+<div v-if="viewMode === 'gantt'" class="gantt-view">
+  <div class="gantt-header">
+    <div class="gantt-title-section">
+      <h2>📈 Диаграмма Ганта</h2>
+      <div class="gantt-controls">
+        <button class="btn btn-small" @click="zoomIn">➕ Увеличить</button>
+        <button class="btn btn-small" @click="zoomOut">➖ Уменьшить</button>
+        <button class="btn btn-small" @click="resetZoom">🔄 Сбросить</button>
+        <button class="btn btn-info" @click="alignReleaseDates">📅 Выровнять даты</button>
+ 
+      </div>
+    </div>
+  </div>
+
+  <div class="gantt-container">
+    <!-- ЛЕВАЯ ПАНЕЛЬ (ФИКСИРОВАННАЯ) - список этапов -->
+    <div class="gantt-sidebar">
+      <div class="sidebar-header">
+        <span>ЭТАПЫ</span>
+      </div>
+      <div class="sidebar-tasks" ref="sidebarTasks" @scroll="syncVerticalScroll">
+        <div 
+          v-for="block in sortedBlocks" 
+  :key="block.id"
+  class="sidebar-task-row"
+  :class="{ 'hovered': hoveredRowId === block.id }"
+  @mouseenter="hoveredRowId = block.id"
+  @mouseleave="hoveredRowId = null"
+  @click="editBlock(block)"
+        >
+          <div class="task-info">
+            <span class="task-title" :title="block.title">{{ block.title }}</span>
+            <span class="task-dates">{{ formatDate(block.startDate) }} — {{ formatDate(block.releaseDate) }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+<!-- ПРАВАЯ ПАНЕЛЬ (ПРОКРУЧИВАЕМАЯ) -->
+<div class="gantt-timeline-panel" ref="ganttTimelinePanel" @scroll="syncHorizontalScroll">
+  <!-- Шкала времени -->
+  <div class="timeline-header" :style="{ width: totalTimelineWidth + 'px' }">
+    <div 
+      v-for="month in timelineMonths" 
+      :key="month.index"
+      class="timeline-month"
+      :style="{ width: monthWidth + 'px' }"
+    >
+      <div class="month-label">{{ month.label }}</div>
+      <div class="month-days">
+        <div 
+          v-for="day in month.days" 
+          :key="day.number"
+          class="day-cell"
+          :style="{ width: dayWidth + 'px' }"
+        ></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Область с задачами -->
+  <div class="timeline-tasks">
+    <div class="tasks-wrapper" :style="{ width: totalTimelineWidth + 'px' }">
+      <!-- СЕТКА ДНЕЙ (фон) -->
+      <div class="days-grid" :style="{ width: totalTimelineWidth + 'px' }">
+        <div 
+          v-for="day in 365" 
+          :key="day"
+          class="grid-day"
+          :style="{ width: dayWidth + 'px' }"
+        ></div>
+      </div>
+
+      <!-- ПОЛОСКА СЕГОДНЯШНЕГО ДНЯ -->
+    <!-- ПОЛОСКА СЕГОДНЯШНЕГО ДНЯ -->
+<div 
+  v-if="todayDayOfYear > 0"
+  class="today-line"
+  :style="{ left: (todayDayOfYear - 1) * dayWidth + 'px' }"
+>
+  <div class="today-label"> </div>
+</div>
+
+      <!-- КОНТЕЙНЕР ЗАДАЧ -->
+      <div class="tasks-container" :style="{ width: totalTimelineWidth + 'px' }">
+        <div 
+                  v-for="block in sortedBlocks" 
+          :key="block.id"
+          class="timeline-task-row-wrapper"
+          :style="{ width: totalTimelineWidth + 'px' }"
+          @mouseenter="hoveredRowId = block.id"
+          @mouseleave="hoveredRowId = null"
+        >
+          <div 
+            class="timeline-task-row"
+            :class="{ 'hovered': hoveredRowId === block.id }"
+            @mouseenter="hoveredRowId = block.id"
+            @mouseleave="hoveredRowId = null"
+          >
+            <div 
+              class="task-bar"
+              :class="{
+                'completed': block.completed,
+                'in-progress': !block.completed && getTaskProgress(block) > 0,
+                'not-started': !block.completed && getTaskProgress(block) === 0,
+                'overdue': isOverdue(block),
+                'task-hovered': hoveredRowId === block.id  // ДОБАВЬТЕ ЭТОТ КЛАСС
+              }"
+              :style="getTaskBarStyle(block)"
+              :title="`${block.title}\n${formatDate(block.startDate)} — ${formatDate(block.releaseDate)}\nПрогресс: ${getTaskProgress(block)}%`"
+              @click="editBlock(block)"
+            >
+              <div class="task-progress" :style="{ width: getTaskProgress(block) + '%' }"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+  </div>
+</div>
+
+
+<!-- Контейнер с прокруткой для блоков -->
+<div 
+ v-if="viewMode !== 'heatmap' && viewMode !== 'gantt'"
     class="timeline-wrapper" 
     ref="timelineWrapper"
     @wheel="onWheel"
@@ -465,7 +599,7 @@
 
   </div> <!-- Закрытие timeline-grid -->
 </div> <!-- Закрытие timeline-container -->
-                    </div>
+  </div>
       </div>
 
 
@@ -493,9 +627,13 @@
         ></textarea>
       </div>
       
-      <div class="form-row">
+       <div class="form-row">
         <div class="form-group">
-          <label>🚀 Дата</label>
+          <label>🚀 Дата начала</label>
+          <input v-model="editingBlock.startDate" type="date">
+        </div>
+        <div class="form-group">
+          <label>📅 Дата окончания</label>
           <input v-model="editingBlock.releaseDate" type="date">
         </div>
       </div>
@@ -558,7 +696,7 @@ const blocks = ref([])
 const timelineWrapper = ref(null)
 const monthsHeader = ref(null)
 const timelineGrid = ref(null)
-
+const hoveredRowId = ref(null)
 // Константы
 const MONTH_WIDTH = 320
 const QUARTER_WIDTH = 580
@@ -578,7 +716,9 @@ const dragOffset = ref(0) // Смещение
 const previewDate = ref('') // Дата для предпросмотра
 const viewMode = ref(localStorage.getItem('roadmap-view-mode') || 'horizontal')
 // Добавляем новый режим: 'months', 'quarters', 'horizontal'
-
+const sidebarTasks = ref(null)
+const timelineTasks = ref(null)
+const ganttTimelinePanel = ref(null)
 // Все месяцы
 const months = [
   { label: 'Январь 2026', monthIndex: 0, type: 'month' },
@@ -610,10 +750,11 @@ const isHorizontal = computed(() => viewMode.value === 'horizontal')
 const visiblePeriods = computed(() => {
   if (viewMode.value === 'months') return months
   if (viewMode.value === 'quarters') return quarters
-  if (viewMode.value === 'horizontal') return months // месяцы как строки
-   if (viewMode.value === 'heatmap') return [] // для тепловой карты периоды не нужны
+  if (viewMode.value === 'horizontal') return months
+  if (viewMode.value === 'heatmap') return []
+  if (viewMode.value === 'gantt') return [] // для ганта периоды не нужны
+  return []
 })
-
 // Ширина периода (для горизонтального режима фиксированная)
 const periodWidth = computed(() => {
     if (viewMode.value === 'months') return MONTH_WIDTH
@@ -621,6 +762,9 @@ const periodWidth = computed(() => {
   if (viewMode.value === 'horizontal') return HORIZONTAL_COLUMN_WIDTH
   return 0
 })
+// Получить сегодняшнюю дату
+const today = new Date()
+
 
 const totalWidth = computed(() => {
   if (viewMode.value === 'horizontal') {
@@ -630,7 +774,12 @@ const totalWidth = computed(() => {
   return visiblePeriods.length * periodWidth.value + 50
 })
 
-
+// Проверка, просрочена ли задача
+const isOverdue = (block) => {
+  if (!block.releaseDate) return false
+  const releaseDate = new Date(block.releaseDate)
+  return releaseDate < today && getTaskProgress(block) < 100
+}
 // Ширина для блоков (обычная)
 const blocksTotalWidth = computed(() => {
   if (viewMode.value === 'horizontal') {
@@ -1630,6 +1779,7 @@ const loadBlocks = async () => {
       description: block.description || '',
       effort: block.effort || 0,
       completed: block.completed || false,
+      startDate: block.startDate || block.releaseDate, // если нет startDate, используем releaseDate
       releaseDate: block.releaseDate || block.startDate,
       tasks: block.tasks || []
     }))
@@ -1638,27 +1788,6 @@ const loadBlocks = async () => {
   }
 }
 
-const createNewBlock = async () => {
-  try {
-    const today = new Date()
-    const releaseDate = new Date(today.getFullYear(), today.getMonth(), 15).toISOString().split('T')[0]
-    
-    const newBlock = {
-      title: `Новый этап`,
-      description: '',
-      releaseDate: releaseDate,
-      effort: 40,
-      completed: false,
-      tasks: []
-    }
-    
-    const response = await axios.post(`${API_URL}/blocks`, newBlock)
-    blocks.value.push(response.data)
-    showNotificationMessage('✅ Этап создан')
-  } catch (error) {
-    console.error('Ошибка создания:', error)
-  }
-}
 
 const clearAllBlocks = async () => {
   if (!confirm('Вы уверены, что хотите удалить все этапы?')) return
@@ -1705,16 +1834,21 @@ const closeModal = () => {
 
 const saveBlock = async () => {
   try {
-    await axios.put(`${API_URL}/blocks/${editingBlock.value.id}`, editingBlock.value)
+    console.log('Сохраняем блок:', editingBlock.value)
+    
+    const response = await axios.put(`${API_URL}/blocks/${editingBlock.value.id}`, editingBlock.value)
+    console.log('Ответ сервера:', response.data)
+    
     const index = blocks.value.findIndex(b => b.id === editingBlock.value.id)
     if (index !== -1) blocks.value[index] = { ...editingBlock.value }
+    
     closeModal()
     showNotificationMessage('✅ Сохранено')
   } catch (error) {
     console.error('Ошибка сохранения:', error)
+    showNotificationMessage('❌ Ошибка сохранения', 'error')
   }
 }
-
 const deleteBlock = async () => {
   if (!confirm('Удалить этап?')) return
   try {
@@ -1727,19 +1861,19 @@ const deleteBlock = async () => {
   }
 }
 const setViewMode = (mode) => {
-  // Проверяем, что режим допустим
-  const validModes = ['horizontal', 'quarters', 'heatmap'] // добавьте 'months' если нужно
+  console.log('Попытка переключения на режим:', mode)
+  console.log('Текущий viewMode до:', viewMode.value)
+  
+  const validModes = ['horizontal', 'quarters', 'heatmap', 'gantt']
   if (!validModes.includes(mode)) {
     console.warn(`Режим "${mode}" не поддерживается`)
     return
   }
   
-  console.log('Переключение на режим:', mode) // для отладки
   viewMode.value = mode
-  localStorage.setItem('roadmap-view-mode', mode)
+  console.log('Текущий viewMode после:', viewMode.value)
   
-  // Сбрасываем позиции блоков только для режимов с временной шкалой
-  if (mode !== 'heatmap') {
+  if (mode !== 'heatmap' && mode !== 'gantt') {
     blocks.value = blocks.value.map(block => {
       const newBlock = { ...block }
       delete newBlock.positionInMonth
@@ -1747,17 +1881,21 @@ const setViewMode = (mode) => {
     })
   }
   
-  // Сбрасываем прокрутку
   if (timelineWrapper.value) {
     timelineWrapper.value.scrollTo({ left: 0, top: 0 })
   }
   
-  // Принудительно синхронизируем шапку
+  // Если переключились на Гант, прокручиваем к сегодня
+  if (mode === 'gantt') {
+    setTimeout(() => {
+      scrollToToday()
+    }, 300)
+  }
+  
   setTimeout(() => {
     syncScroll()
   }, 50)
 }
-
 const formatDate = (dateStr) => {
   if (!dateStr) return ''
   const date = new Date(dateStr)
@@ -1783,10 +1921,16 @@ watch(viewMode, () => {
 onMounted(() => {
   axios.post(`${API_URL}/init`).then(() => {
     loadBlocks().then(() => {
-      // migrateExistingTasks() - больше не нужна
+      migrateBlocksStartDate()
       updateAllPositions()
+      
+      // Прокрутка к сегодняшнему дню после загрузки всех данных
+      setTimeout(() => {
+        scrollToToday()
+      }, 500)
     })
   })
+  
   setInterval(() => {
     currentQuote.value = quotes[Math.floor(Math.random() * quotes.length)]
   }, 10000)
@@ -1868,240 +2012,263 @@ const getBlockColorByProgressVibrant = (block) => {
 // ==========================================
 // ЭКСПОРТ В PNG И PDF (полная версия)
 // ==========================================
-
 const exportAsPNG = async () => {
   try {
     showNotificationMessage('🔄 Подготовка изображения...', 'info')
     
-    // Находим основной контейнер с роадмапом
-    const mainContent = document.querySelector('.main-content')
-    const timelineWrapper = document.querySelector('.timeline-wrapper')
-    const timelineGrid = document.querySelector('.timeline-grid')
-    const monthsHeaderElement = document.querySelector('.months-header')
-    const horizontalHeaderElement = document.querySelector('.horizontal-header')
-    
-    if (!mainContent || !timelineWrapper || !timelineGrid) return
-    
-    // Сохраняем исходные стили
-    const originalMainHeight = mainContent.style.height
-    const originalWrapperHeight = timelineWrapper.style.height
-    const originalWrapperOverflow = timelineWrapper.style.overflow
-    const originalGridHeight = timelineGrid.style.height
-    
-    // Временно убираем ограничения высоты
-    mainContent.style.height = 'auto'
-    timelineWrapper.style.height = 'auto'
-    timelineWrapper.style.overflow = 'visible'
-    
-    // Определяем нужную шапку в зависимости от режима
-    const header = viewMode.value === 'horizontal' ? horizontalHeaderElement : monthsHeaderElement
-    
-    // Вычисляем полную высоту контента
-    const fullHeight = timelineGrid.scrollHeight + (header?.scrollHeight || 0) + 40
-    
-    // Создаем временный контейнер
-    const tempContainer = document.createElement('div')
-    tempContainer.style.width = timelineWrapper.scrollWidth + 'px'
-    tempContainer.style.backgroundColor = '#ffffff'
-    tempContainer.style.padding = '20px'
-    tempContainer.style.position = 'absolute'
-    tempContainer.style.left = '-9999px'
-    tempContainer.style.top = '-9999px'
-    tempContainer.style.zIndex = '-1000'
-    
-    // Клонируем шапку (если есть)
-    if (header) {
-      const headerClone = header.cloneNode(true)
-      headerClone.style.margin = '0 0 20px 0'
-      headerClone.style.borderBottom = '2px solid #3b82f6'
-      headerClone.style.pointerEvents = 'auto' // Сбрасываем pointer-events для клона
-      headerClone.style.overflow = 'visible' // Показываем всю шапку
-      
-      // Для горизонтальной шапки убираем лишние ограничения
-      if (viewMode.value === 'horizontal') {
-        headerClone.style.pointerEvents = 'auto'
-        headerClone.style.height = '50px' // Фиксируем высоту
-      }
-      
-      tempContainer.appendChild(headerClone)
-    }
-    
-    // Клонируем сетку с блоками
-    const gridClone = timelineGrid.cloneNode(true)
-    gridClone.style.height = 'auto'
-    gridClone.style.minHeight = fullHeight + 'px'
-    gridClone.style.overflow = 'visible'
-    
-    // Убираем классы перетаскивания у клона
-    gridClone.querySelectorAll('.line-dragging-active, .block-dragging, .block-header-dragging').forEach(el => {
-      el.classList.remove('line-dragging-active', 'block-dragging', 'block-header-dragging')
-    })
-    
-    tempContainer.appendChild(gridClone)
-    
-    document.body.appendChild(tempContainer)
-    
-    // Даем время на рендер
-    await new Promise(resolve => setTimeout(resolve, 200))
-    
-    // Создаем canvas
-    const canvas = await html2canvas(tempContainer, {
+    let elementToExport
+    let exportOptions = {
       scale: 2,
       backgroundColor: '#ffffff',
       allowTaint: false,
       useCORS: true,
-      logging: false,
-      windowWidth: tempContainer.scrollWidth,
-      windowHeight: tempContainer.scrollHeight,
-      onclone: (clonedDoc) => {
-        // Убираем скроллы в клоне
-        const clonedElements = clonedDoc.querySelectorAll('.timeline-wrapper, .main-content, .horizontal-header, .months-header')
-        clonedElements.forEach(el => {
-          if (el) {
-            el.style.overflow = 'visible'
-            el.style.height = 'auto'
-            el.style.pointerEvents = 'auto'
-          }
-        })
-        
-        // Для горизонтальной шапки убираем pointer-events: none
-        const clonedHeader = clonedDoc.querySelector('.horizontal-header')
-        if (clonedHeader) {
-          clonedHeader.style.pointerEvents = 'auto'
-          clonedHeader.style.overflow = 'visible'
-        }
+      logging: false
+    }
+    
+    // Определяем элемент для экспорта в зависимости от режима
+    if (viewMode.value === 'heatmap') {
+      // Для тепловой карты - экспортируем весь heatmap-view
+      elementToExport = document.querySelector('.heatmap-view')
+      if (!elementToExport) {
+        showNotificationMessage('❌ Тепловая карта не найдена', 'error')
+        return
       }
-    })
+      
+      // Временно убираем ограничения, чтобы захватить всё
+      const originalHeight = elementToExport.style.height
+      const originalOverflow = elementToExport.style.overflow
+      
+      elementToExport.style.height = 'auto'
+      elementToExport.style.overflow = 'visible'
+      
+      // Создаем canvas
+      exportOptions.windowWidth = elementToExport.scrollWidth
+      exportOptions.windowHeight = elementToExport.scrollHeight
+      
+      const canvas = await html2canvas(elementToExport, exportOptions)
+      
+      // Восстанавливаем стили
+      elementToExport.style.height = originalHeight
+      elementToExport.style.overflow = originalOverflow
+      
+      const fileName = `roadmap-heatmap-${new Date().toISOString().slice(0,10)}.png`
+      const link = document.createElement('a')
+      link.download = fileName
+      link.href = canvas.toDataURL('image/png')
+      link.click()
+      
+      showNotificationMessage(`✅ Тепловая карта сохранена как PNG`)
+      return
+      
+    } else if (viewMode.value === 'gantt') {
+      // Для Ганта - экспортируем весь gantt-view
+      elementToExport = document.querySelector('.gantt-view')
+      if (!elementToExport) {
+        showNotificationMessage('❌ Диаграмма Ганта не найдена', 'error')
+        return
+      }
+      
+      // Сохраняем оригинальные стили
+      const originalHeight = elementToExport.style.height
+      const originalOverflow = elementToExport.style.overflow
+      
+      // Временно убираем ограничения
+      elementToExport.style.height = 'auto'
+      elementToExport.style.overflow = 'visible'
+      
+      // Для Ганта также нужно убедиться, что контейнер с задачами видим полностью
+      const ganttContainer = elementToExport.querySelector('.gantt-container')
+      if (ganttContainer) {
+        const originalContainerOverflow = ganttContainer.style.overflow
+        ganttContainer.style.overflow = 'visible'
+      }
+      
+      // Создаем canvas для всего gantt-view
+      exportOptions.windowWidth = elementToExport.scrollWidth
+      exportOptions.windowHeight = elementToExport.scrollHeight
+      
+      const canvas = await html2canvas(elementToExport, exportOptions)
+      
+      // Восстанавливаем стили
+      elementToExport.style.height = originalHeight
+      elementToExport.style.overflow = originalOverflow
+      
+      if (ganttContainer) {
+        ganttContainer.style.overflow = ''
+      }
+      
+      const fileName = `roadmap-gantt-${new Date().toISOString().slice(0,10)}.png`
+      const link = document.createElement('a')
+      link.download = fileName
+      link.href = canvas.toDataURL('image/png')
+      link.click()
+      
+      showNotificationMessage(`✅ Диаграмма Ганта сохранена как PNG`)
+      return
+      
+    } else {
+      // Для обычных режимов (horizontal, quarters)
+      elementToExport = document.querySelector('.main-content')
+      
+      if (!elementToExport) {
+        showNotificationMessage('❌ Контент не найден', 'error')
+        return
+      }
+      
+      // Сохраняем исходные стили
+      const timelineWrapper = document.querySelector('.timeline-wrapper')
+      const timelineGrid = document.querySelector('.timeline-grid')
+      
+      if (timelineWrapper) {
+        timelineWrapper.style.overflow = 'visible'
+        timelineWrapper.style.height = 'auto'
+      }
+      
+      if (timelineGrid && (viewMode.value === 'horizontal' || viewMode.value === 'quarters')) {
+        timelineGrid.style.height = totalHeight.value + 'px'
+      }
+      
+      exportOptions.windowWidth = elementToExport.scrollWidth
+      exportOptions.windowHeight = elementToExport.scrollHeight
+      
+      const canvas = await html2canvas(elementToExport, exportOptions)
+      
+      // Восстанавливаем стили
+      if (timelineWrapper) {
+        timelineWrapper.style.overflow = ''
+        timelineWrapper.style.height = ''
+      }
+      
+      if (timelineGrid) {
+        timelineGrid.style.height = ''
+      }
+      
+      const modeNames = {
+        'horizontal': 'months',
+        'quarters': 'quarters'
+      }
+      
+      const modeName = modeNames[viewMode.value] || viewMode.value
+      const fileName = `roadmap-${modeName}-${new Date().toISOString().slice(0,10)}.png`
+      
+      const link = document.createElement('a')
+      link.download = fileName
+      link.href = canvas.toDataURL('image/png')
+      link.click()
+      
+      showNotificationMessage(`✅ ${modeName} сохранен как PNG`)
+      return
+    }
     
-    // Удаляем временный контейнер
-    document.body.removeChild(tempContainer)
-    
-    // Восстанавливаем исходные стили
-    mainContent.style.height = originalMainHeight
-    timelineWrapper.style.height = originalWrapperHeight
-    timelineWrapper.style.overflow = originalWrapperOverflow
-    timelineGrid.style.height = originalGridHeight
-    
-    // Создаем ссылку для скачивания
-    const modeName = viewMode.value === 'horizontal' ? 'horizontal' : 
-                    viewMode.value === 'quarters' ? 'quarters' : 'months'
-    
-    const link = document.createElement('a')
-    link.download = `roadmap-${modeName}-${new Date().toISOString().slice(0,10)}.png`
-    link.href = canvas.toDataURL('image/png')
-    link.click()
-    
-    showNotificationMessage(`✅ Изображение сохранено (${modeName})`)
   } catch (error) {
     console.error('Ошибка при экспорте PNG:', error)
     showNotificationMessage('❌ Ошибка экспорта', 'error')
-    
-    // Восстанавливаем стили в случае ошибки
-    const mainContent = document.querySelector('.main-content')
-    const timelineWrapper = document.querySelector('.timeline-wrapper')
-    const timelineGrid = document.querySelector('.timeline-grid')
-    
-    if (mainContent) mainContent.style.height = ''
-    if (timelineWrapper) {
-      timelineWrapper.style.height = ''
-      timelineWrapper.style.overflow = ''
-    }
-    if (timelineGrid) timelineGrid.style.height = ''
   }
 }
 const exportAsPDF = async () => {
   try {
-    showNotificationMessage('🔄 Подготовка PDF (А4, альбомная)...', 'info')
+    showNotificationMessage('🔄 Подготовка PDF...', 'info')
     
-    // Находим основные элементы
-    const mainContent = document.querySelector('.main-content')
-    const timelineWrapper = document.querySelector('.timeline-wrapper')
-    const timelineGrid = document.querySelector('.timeline-grid')
-    const monthsHeaderElement = document.querySelector('.months-header')
-    const horizontalHeaderElement = document.querySelector('.horizontal-header')
-    
-    if (!mainContent || !timelineWrapper || !timelineGrid) return
-    
-    // Сохраняем исходные стили
-    const originalMainHeight = mainContent.style.height
-    const originalWrapperHeight = timelineWrapper.style.height
-    const originalWrapperOverflow = timelineWrapper.style.overflow
-    const originalGridHeight = timelineGrid.style.height
-    
-    // Временно убираем ограничения высоты
-    mainContent.style.height = 'auto'
-    timelineWrapper.style.height = 'auto'
-    timelineWrapper.style.overflow = 'visible'
-    
-    // Определяем нужную шапку
-    const header = viewMode.value === 'horizontal' ? horizontalHeaderElement : monthsHeaderElement
-    
-    // Вычисляем полную высоту контента
-    const fullHeight = timelineGrid.scrollHeight + (header?.scrollHeight || 0) + 40
-    
-    // Создаем временный контейнер
-    const tempContainer = document.createElement('div')
-    tempContainer.style.width = timelineWrapper.scrollWidth + 'px'
-    tempContainer.style.backgroundColor = '#ffffff'
-    tempContainer.style.padding = '20px'
-    tempContainer.style.position = 'absolute'
-    tempContainer.style.left = '-9999px'
-    tempContainer.style.top = '-9999px'
-    tempContainer.style.zIndex = '-1000'
-    
-    // Клонируем шапку (если есть)
-    if (header) {
-      const headerClone = header.cloneNode(true)
-      headerClone.style.margin = '0 0 20px 0'
-      headerClone.style.borderBottom = '2px solid #3b82f6'
-      headerClone.style.pointerEvents = 'auto'
-      headerClone.style.overflow = 'visible'
-      
-      if (viewMode.value === 'horizontal') {
-        headerClone.style.pointerEvents = 'auto'
-        headerClone.style.height = '50px'
-      }
-      
-      tempContainer.appendChild(headerClone)
-    }
-    
-    // Клонируем сетку с блоками
-    const gridClone = timelineGrid.cloneNode(true)
-    gridClone.style.height = 'auto'
-    gridClone.style.minHeight = fullHeight + 'px'
-    gridClone.style.overflow = 'visible'
-    
-    // Убираем классы перетаскивания
-    gridClone.querySelectorAll('.line-dragging-active, .block-dragging, .block-header-dragging').forEach(el => {
-      el.classList.remove('line-dragging-active', 'block-dragging', 'block-header-dragging')
-    })
-    
-    tempContainer.appendChild(gridClone)
-    
-    document.body.appendChild(tempContainer)
-    
-    // Даем время на рендер
-    await new Promise(resolve => setTimeout(resolve, 200))
-    
-    // Создаем canvas
-    const canvas = await html2canvas(tempContainer, {
+    let elementToExport
+    let exportOptions = {
       scale: 2,
       backgroundColor: '#ffffff',
       allowTaint: false,
       useCORS: true,
-      logging: false,
-      windowWidth: tempContainer.scrollWidth,
-      windowHeight: tempContainer.scrollHeight
-    })
+      logging: false
+    }
     
-    // Удаляем временный контейнер
-    document.body.removeChild(tempContainer)
+    // Определяем элемент для экспорта в зависимости от режима
+    if (viewMode.value === 'heatmap') {
+      elementToExport = document.querySelector('.heatmap-view')
+      if (!elementToExport) {
+        showNotificationMessage('❌ Тепловая карта не найдена', 'error')
+        return
+      }
+      
+      const originalHeight = elementToExport.style.height
+      const originalOverflow = elementToExport.style.overflow
+      
+      elementToExport.style.height = 'auto'
+      elementToExport.style.overflow = 'visible'
+      
+      exportOptions.windowWidth = elementToExport.scrollWidth
+      exportOptions.windowHeight = elementToExport.scrollHeight
+      
+    } else if (viewMode.value === 'gantt') {
+      // Для Ганта - экспортируем весь gantt-view
+      elementToExport = document.querySelector('.gantt-view')
+      if (!elementToExport) {
+        showNotificationMessage('❌ Диаграмма Ганта не найдена', 'error')
+        return
+      }
+      
+      const originalHeight = elementToExport.style.height
+      const originalOverflow = elementToExport.style.overflow
+      
+      elementToExport.style.height = 'auto'
+      elementToExport.style.overflow = 'visible'
+      
+      const ganttContainer = elementToExport.querySelector('.gantt-container')
+      if (ganttContainer) {
+        ganttContainer.style.overflow = 'visible'
+      }
+      
+      exportOptions.windowWidth = elementToExport.scrollWidth
+      exportOptions.windowHeight = elementToExport.scrollHeight
+      
+    } else {
+      elementToExport = document.querySelector('.main-content')
+      
+      if (!elementToExport) {
+        showNotificationMessage('❌ Контент не найден', 'error')
+        return
+      }
+      
+      const timelineWrapper = document.querySelector('.timeline-wrapper')
+      const timelineGrid = document.querySelector('.timeline-grid')
+      
+      if (timelineWrapper) {
+        timelineWrapper.style.overflow = 'visible'
+        timelineWrapper.style.height = 'auto'
+      }
+      
+      if (timelineGrid && (viewMode.value === 'horizontal' || viewMode.value === 'quarters')) {
+        timelineGrid.style.height = totalHeight.value + 'px'
+      }
+      
+      exportOptions.windowWidth = elementToExport.scrollWidth
+      exportOptions.windowHeight = elementToExport.scrollHeight
+    }
     
-    // Восстанавливаем исходные стили
-    mainContent.style.height = originalMainHeight
-    timelineWrapper.style.height = originalWrapperHeight
-    timelineWrapper.style.overflow = originalWrapperOverflow
-    timelineGrid.style.height = originalGridHeight
+    // Создаем canvas
+    const canvas = await html2canvas(elementToExport, exportOptions)
+    
+    // Восстанавливаем стили
+    if (viewMode.value === 'heatmap' || viewMode.value === 'gantt') {
+      if (elementToExport) {
+        elementToExport.style.height = ''
+        elementToExport.style.overflow = ''
+      }
+      if (viewMode.value === 'gantt') {
+        const ganttContainer = elementToExport?.querySelector('.gantt-container')
+        if (ganttContainer) {
+          ganttContainer.style.overflow = ''
+        }
+      }
+    } else {
+      const timelineWrapper = document.querySelector('.timeline-wrapper')
+      const timelineGrid = document.querySelector('.timeline-grid')
+      
+      if (timelineWrapper) {
+        timelineWrapper.style.overflow = ''
+        timelineWrapper.style.height = ''
+      }
+      
+      if (timelineGrid) {
+        timelineGrid.style.height = ''
+      }
+    }
     
     // Получаем изображение
     const imgData = canvas.toDataURL('image/png')
@@ -2144,8 +2311,14 @@ const exportAsPDF = async () => {
     }
     
     // Добавляем информацию о режиме
-    const modeName = viewMode.value === 'horizontal' ? 'Горизонтальный' : 
-                    viewMode.value === 'quarters' ? 'По кварталам' : 'По месяцам'
+    const modeNames = {
+      'horizontal': 'По месяцам',
+      'quarters': 'По кварталам',
+      'heatmap': 'Тепловая карта',
+      'gantt': 'Диаграмма Ганта'
+    }
+    
+    const modeName = modeNames[viewMode.value] || viewMode.value
     
     pdf.setFontSize(8)
     pdf.setTextColor(100, 100, 100)
@@ -2155,27 +2328,16 @@ const exportAsPDF = async () => {
       pageHeight - 5
     )
     
-    pdf.save(`roadmap-${viewMode.value}-${new Date().toISOString().slice(0,10)}.pdf`)
+    const fileName = `roadmap-${viewMode.value}-${new Date().toISOString().slice(0,10)}.pdf`
+    pdf.save(fileName)
     
-    showNotificationMessage(`✅ PDF сохранен (${modeName})`)
+    showNotificationMessage(`✅ ${modeName} сохранен как PDF`)
+    
   } catch (error) {
     console.error('Ошибка при экспорте PDF:', error)
     showNotificationMessage('❌ Ошибка экспорта', 'error')
-    
-    // Восстанавливаем стили
-    const mainContent = document.querySelector('.main-content')
-    const timelineWrapper = document.querySelector('.timeline-wrapper')
-    const timelineGrid = document.querySelector('.timeline-grid')
-    
-    if (mainContent) mainContent.style.height = ''
-    if (timelineWrapper) {
-      timelineWrapper.style.height = ''
-      timelineWrapper.style.overflow = ''
-    }
-    if (timelineGrid) timelineGrid.style.height = ''
   }
 }
-
 
 // Расчет позиции линии по дате (в пикселях от начала месяца)
 const getDatePosition = (block) => {
@@ -3163,6 +3325,359 @@ const editTaskFromStage = (stageId, taskId) => {
   // Запускаем редактирование задачи
   startTaskEdit(block, task, event)
 }
+
+
+// Состояние для диаграммы Ганта
+const ganttContainer = ref(null)
+const ganttTasks = ref(null)
+const zoomLevel = ref(1)
+
+// Параметры отображения
+const dayWidth = computed(() => 20 * zoomLevel.value)
+const monthWidth = computed(() => 30 * dayWidth.value)
+
+// Генерация месяцев для шкалы времени
+const timelineMonths = computed(() => {
+  const months = []
+  const startDate = new Date(2026, 0, 1)
+  
+  for (let i = 0; i < 12; i++) {
+    const date = new Date(2026, i, 1)
+    const daysInMonth = new Date(2026, i + 1, 0).getDate()
+    
+    months.push({
+      index: i,
+      label: date.toLocaleString('ru', { month: 'long' }),
+      days: daysInMonth
+    })
+  }
+  
+  return months
+})
+
+// Получение стиля для полосы задачи
+const getTaskBarStyle = (block) => {
+  if (!block.startDate || !block.releaseDate) return {}
+  
+  const start = new Date(block.startDate)
+  const end = new Date(block.releaseDate)
+  
+  // Вычисляем день в году (1-365)
+  const startDayOfYear = getDayOfYear(start)
+  const endDayOfYear = getDayOfYear(end)
+  
+  // Длительность в днях
+  const duration = endDayOfYear - startDayOfYear + 1
+  
+  return {
+    left: (startDayOfYear - 1) * dayWidth.value + 'px',
+    width: duration * dayWidth.value + 'px'
+  }
+}
+// Синхронизация прокрутки
+const syncTimelineScroll = (event) => {
+  // Можно добавить дополнительную логику при необходимости
+  console.log('Timeline scrolled:', event.target.scrollLeft)
+}
+// Вспомогательная функция для получения дня в году
+const getDayOfYear = (date) => {
+  const start = new Date(date.getFullYear(), 0, 1) // 1 января
+  const diff = date - start
+  const oneDay = 1000 * 60 * 60 * 24
+  return Math.floor(diff / oneDay) + 1 // +1 потому что 1 января это день 1
+}
+// Вычислить день года для сегодняшней даты, но для 2026 года
+// Вычислить день года для сегодняшней даты в 2026 году
+const todayDayOfYear = computed(() => {
+  // Создаем дату с тем же месяцем и днем, но в 2026 году
+  const todayIn2026 = new Date(2026, today.getMonth(), today.getDate())
+  const dayOfYear = getDayOfYear(todayIn2026)
+  // Форматирование для метки
+const todayLabel = computed(() => {
+  const date = todayIn2026.value
+  const day = date.getDate().toString().padStart(2, '0')
+  const month = (date.getMonth() + 1).toString().padStart(2, '0')
+  return `${day}.${month}`
+})
+  console.log('=== СЕГОДНЯ ===')
+  console.log('Сегодня:', formatDate(today))
+  console.log('В 2026 году:', formatDate(todayIn2026))
+  console.log('День года:', dayOfYear)
+  
+  return dayOfYear
+})
+
+// Функции масштабирования
+const zoomIn = () => {
+  zoomLevel.value = Math.min(zoomLevel.value + 0.2, 2)
+}
+
+const zoomOut = () => {
+  zoomLevel.value = Math.max(zoomLevel.value - 0.2, 0.5)
+}
+
+const resetZoom = () => {
+  zoomLevel.value = 1
+}
+
+// Обработка прокрутки
+const handleScroll = () => {
+  if (ganttContainer.value) {
+    scrollLeft.value = ganttContainer.value.scrollLeft
+  }
+}
+
+// Добавьте эту функцию для обновления существующих блоков
+const migrateBlocksStartDate = async () => {
+  let hasChanges = false
+  
+  const updatedBlocks = blocks.value.map(block => {
+    if (!block.startDate) {
+      hasChanges = true
+      // Если нет startDate, устанавливаем за 7 дней до releaseDate
+      const releaseDate = new Date(block.releaseDate)
+      const startDate = new Date(releaseDate)
+      startDate.setDate(releaseDate.getDate() - 7)
+      
+      return {
+        ...block,
+        startDate: startDate.toISOString().split('T')[0]
+      }
+    }
+    return block
+  })
+  
+  if (hasChanges) {
+    for (const block of updatedBlocks) {
+      try {
+        await axios.put(`${API_URL}/blocks/${block.id}`, block)
+      } catch (error) {
+        console.error('Ошибка при миграции блока:', error)
+      }
+    }
+    blocks.value = updatedBlocks
+    console.log('✅ Блоки обновлены с датами начала')
+  }
+}
+
+// Вызовите в onMounted после загрузки
+onMounted(() => {
+  axios.post(`${API_URL}/init`).then(() => {
+    loadBlocks().then(() => {
+//migrateBlocksStartDate() // добавляем даты начала для старых блоков
+      updateAllPositions()
+    })
+  })
+  setInterval(() => {
+    currentQuote.value = quotes[Math.floor(Math.random() * quotes.length)]
+  }, 10000)
+})
+
+// Получить дату из дня года (1-365)
+const getDateFromDay = (day) => {
+  const date = new Date(2026, 0, day)
+  return formatDate(date)
+}
+
+// Синхронизация вертикальной прокрутки
+const syncVerticalScroll = (event) => {
+  const source = event.target
+  
+  // Определяем, откуда пришло событие
+  if (source === sidebarTasks.value) {
+    // Если прокрутили левую панель, синхронизируем правую
+    if (timelineTasks.value) {
+      timelineTasks.value.scrollTop = source.scrollTop
+    }
+  } else if (source === timelineTasks.value) {
+    // Если прокрутили правую панель, синхронизируем левую
+    if (sidebarTasks.value) {
+      sidebarTasks.value.scrollTop = source.scrollTop
+    }
+  }
+}
+
+// Синхронизация горизонтальной прокрутки
+const syncHorizontalScroll = (event) => {
+  // Можно добавить логику для синхронизации чего-либо
+  console.log('Horizontal scroll position:', event.target.scrollLeft)
+}
+
+// Общая ширина таймлайна (365 дней * ширина дня)
+const totalTimelineWidth = computed(() => {
+  return 365 * dayWidth.value
+})
+// Функция для сортировки и выравнивания дат этапов
+const alignReleaseDates = () => {
+  // Сортируем этапы по дате начала
+  const sorted = [...blocks.value].sort((a, b) => {
+    return new Date(a.startDate) - new Date(b.startDate)
+  })
+  
+  let currentDate = new Date(sorted[0]?.startDate || new Date())
+  
+  // Проходим по всем этапам и выравниваем даты
+  for (let i = 0; i < sorted.length; i++) {
+    const block = sorted[i]
+    const startDate = new Date(block.startDate)
+    const endDate = new Date(block.releaseDate)
+    const duration = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24))
+    
+    // Устанавливаем дату начала
+    block.startDate = formatDateForInput(currentDate)
+    
+    // Вычисляем дату окончания
+    const newEndDate = new Date(currentDate)
+    newEndDate.setDate(currentDate.getDate() + duration)
+    block.releaseDate = formatDateForInput(newEndDate)
+    
+    // Следующий этап начинается после текущего
+    currentDate = new Date(newEndDate)
+    currentDate.setDate(currentDate.getDate() + 1) // +1 день зазор между этапами
+  }
+  
+  // Обновляем блоки
+  blocks.value = sorted
+  
+  // Сохраняем изменения
+  saveAllBlocks()
+  showNotificationMessage('✅ Даты этапов выровнены')
+}
+
+// Вспомогательная функция для форматирования даты
+const formatDateForInput = (date) => {
+  const year = date.getFullYear()
+  const month = (date.getMonth() + 1).toString().padStart(2, '0')
+  const day = date.getDate().toString().padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+// Сохранение всех блоков
+const saveAllBlocks = async () => {
+  for (const block of blocks.value) {
+    try {
+      await axios.put(`${API_URL}/blocks/${block.id}`, block)
+    } catch (error) {
+      console.error('Ошибка при сохранении блока:', error)
+    }
+  }
+}
+// Автоматический расчет длительности на основе трудозатрат
+const calculateDuration = (effort) => {
+  // Пример: 40 часов = 5 рабочих дней (8 часов в день)
+  const workHoursPerDay = 8
+  return Math.ceil(effort / workHoursPerDay)
+}
+
+// При создании нового этапа
+const createNewBlock = async () => {
+  try {
+    const today = new Date()
+    
+    // Находим последний этап
+    const lastBlock = [...blocks.value].sort((a, b) => {
+      return new Date(b.releaseDate) - new Date(a.releaseDate)
+    })[0]
+    
+    // Дата начала - следующий день после последнего этапа
+    let startDate
+    if (lastBlock) {
+      const lastDate = new Date(lastBlock.releaseDate)
+      startDate = new Date(lastDate)
+      startDate.setDate(lastDate.getDate() + 1)
+    } else {
+      startDate = new Date(today.getFullYear(), today.getMonth(), 1)
+    }
+    
+    const effort = 40
+    const duration = calculateDuration(effort)
+    
+    const releaseDate = new Date(startDate)
+    releaseDate.setDate(startDate.getDate() + duration)
+    
+    const newBlock = {
+      title: `Новый этап`,
+      description: '',
+      startDate: formatDateForInput(startDate),
+      releaseDate: formatDateForInput(releaseDate),
+      effort: effort,
+      completed: false,
+      tasks: []
+    }
+    
+    const response = await axios.post(`${API_URL}/blocks`, newBlock)
+    blocks.value.push(response.data)
+    showNotificationMessage('✅ Этап создан')
+  } catch (error) {
+    console.error('Ошибка создания:', error)
+  }
+}
+const checkDateOverlaps = () => {
+  const sorted = [...blocks.value].sort((a, b) => new Date(a.startDate) - new Date(b.startDate))
+  const overlaps = []
+  
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const current = sorted[i]
+    const next = sorted[i + 1]
+    const currentEnd = new Date(current.releaseDate)
+    const nextStart = new Date(next.startDate)
+    
+    if (currentEnd >= nextStart) {
+      overlaps.push({
+        current: current.title,
+        next: next.title,
+        gap: Math.ceil((currentEnd - nextStart) / (1000 * 60 * 60 * 24)) + 1
+      })
+    }
+  }
+  
+  if (overlaps.length > 0) {
+    console.warn('Обнаружены перекрытия дат:', overlaps)
+    // Можно показать уведомление
+    showNotificationMessage(`⚠️ Обнаружены перекрытия дат (${overlaps.length})`, 'warning')
+  }
+  
+  return overlaps
+}
+// Флаг для режима
+const parallelMode = ref(false)
+
+// Переключение режима
+const toggleParallelMode = () => {
+  parallelMode.value = !parallelMode.value
+  showNotificationMessage(parallelMode.value ? '🔄 Режим: параллельный' : '⏩ Режим: последовательный')
+}
+
+// При создании нового этапа в параллельном режиме
+const createParallelBlock = async () => {
+  // Создаем этап, который может выполняться параллельно с текущими
+  // Дата начала = сегодня, дата окончания = сегодня + длительность
+}
+
+// Функция для прокрутки к сегодняшнему дню
+const scrollToToday = () => {
+  if (viewMode.value !== 'gantt' || !ganttTimelinePanel.value) return
+  
+  // Вычисляем позицию сегодняшнего дня
+  const todayPos = (todayDayOfYear.value - 1) * dayWidth.value
+  const containerWidth = ganttTimelinePanel.value.clientWidth
+  
+  // Центрируем сегодняшний день
+  const scrollPos = todayPos - containerWidth / 2 + dayWidth.value / 2
+  
+  console.log('Прокрутка к сегодняшнему дню:', {
+    todayPos,
+    containerWidth,
+    scrollPos
+  })
+  
+  // Плавная прокрутка
+  ganttTimelinePanel.value.scrollTo({
+    left: Math.max(0, scrollPos),
+    behavior: 'smooth'
+  })
+}
+
 </script>
 
 <style scoped>
@@ -5080,5 +5595,357 @@ const editTaskFromStage = (stageId, taskId) => {
 
 .task-edit-save:hover {
   background: #2563eb;
+}
+
+/* ========== ДИАГРАММА ГАНТА ========== */
+.gantt-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+.gantt-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  background: white;
+  padding: 16px 20px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.gantt-title-section h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 10px 0;
+}
+
+.gantt-controls {
+  display: flex;
+  gap: 8px;
+}
+.sidebar-task-row .task-title {
+  line-height: 1.2;
+  margin: 0;
+}
+
+.task-dates {
+  line-height: 1.2;
+  margin-top: 2px;
+}
+/* ОСНОВНОЙ КОНТЕЙНЕР */
+.gantt-container {
+  flex: 1;
+  display: flex;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ЛЕВАЯ ПАНЕЛЬ */
+.gantt-sidebar {
+  width: 250px;
+  background: #f8fafc;
+  border-right: 2px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.sidebar-header {
+  height:40px;
+  padding: 0 12px;
+  background: #f1f5f9;
+  border-bottom: 1px solid #e2e8f0;
+  font-weight: 600;
+  color: #475569;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+ position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+
+.sidebar-tasks {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.sidebar-task-row {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f1f5f9;
+  cursor: pointer;
+  transition: background 0.2s;
+  height: 50px;
+  display: flex;
+  align-items: center;
+}
+
+.sidebar-task-row:hover {
+ background: #e2e8f0;
+}
+
+
+/* Более простой способ - использовать data-атрибуты */
+.gantt-container {
+  position: relative;
+}
+
+/* Подсветка при наведении на левую панель */
+.sidebar-task-row:hover {
+  background: #e2e8f0;
+  position: relative;
+  z-index: 5;
+}
+
+/* Подсветка при наведении на правую панель */
+.timeline-task-row:hover {
+  background: rgba(59, 130, 246, 0.1);
+}
+.timeline-task-row {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  z-index: 2;
+}
+
+.timeline-task-row-wrapper {
+  position: relative;
+  height: 50px;
+  width: 100%;
+  z-index: 1;
+}
+/* Но нам нужно, чтобы при наведении на название в левой панели 
+   подсвечивалась соответствующая полоса в правой */
+.gantt-sidebar .sidebar-task-row:hover {
+  background: #e2e8f0;
+}
+
+
+.task-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+}
+
+.task-title {
+  font-weight: 600;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.task-dates {
+  font-size: 0.65rem;
+  color: #64748b;
+}
+
+/* ПРАВАЯ ПАНЕЛЬ */
+.gantt-timeline-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-x: auto;
+  overflow-y: hidden;
+  position: relative;
+  height: 100%;
+}
+
+/* ШАПКА С МЕСЯЦАМИ */
+.timeline-header {
+  display: flex;
+  background: white;
+  border-bottom: 2px solid #e2e8f0;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.timeline-month {
+  flex-shrink: 0;
+  border-right: 1px solid #e2e8f0;
+}
+
+.month-label {
+  text-align: center;
+  padding: 8px;
+  font-weight: 600;
+  color: #475569;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.month-days {
+  display: none;
+  height: 20px;
+  background: #f8fafc;
+}
+
+.day-cell {
+  height: 100%;
+  border-right: 1px solid #e2e8f0;
+  background: transparent;
+  flex-shrink: 0;
+}
+
+/* ОБЛАСТЬ С ЗАДАЧАМИ */
+.timeline-tasks {
+  flex: 1;
+  position: relative;
+  overflow: visible;
+}
+
+.tasks-wrapper {
+  position: relative;
+  min-height: 100%;
+}
+
+/* СЕТКА ДНЕЙ */
+.days-grid {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.grid-day {
+  height: 100vh; /* На всю высоту */
+  border-right: 1px solid #f1f5f9;
+  background: transparent;
+  flex-shrink: 0;
+}
+
+/* ПОЛОСКА СЕГОДНЯ */
+.today-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #ef4444;
+  z-index: 30;
+  pointer-events: none;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+}
+.today-label {
+  position: absolute;
+  top: -8px; /* Поднимаем над линией */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 16px;
+  height: 16px;
+  background: #ef4444;
+  border-radius: 50%; /* Делает круг */
+  border: 2px solid white;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.5);
+  z-index: 1001;
+}
+
+/* КОНТЕЙНЕР ЗАДАЧ */
+.tasks-container {
+  position: relative;
+  z-index: 5;
+}
+
+.timeline-task-row-wrapper {
+  position: relative;
+  height: 50px;
+}
+
+.timeline-task-row {
+  position: relative;
+  height: 100%;
+  width: 100%;
+}
+
+/* Подсветка для левой панели */
+.sidebar-task-row.hovered {
+  background: #e2e8f0;
+  box-shadow: inset 3px 0 0 #3b82f6;
+  position: relative;
+  z-index: 10;
+}
+
+/* Подсветка для правой панели (вся строка) */
+.timeline-task-row.hovered {
+  position: relative;
+}
+.timeline-task-row.hovered::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(59, 130, 246, 0.1);
+  pointer-events: none;
+  z-index: 1;
+  width: 100%;
+}
+/* Подсветка полосы задачи при наведении на строку */
+
+/* ПОЛОСЫ ЗАДАЧ */
+.task-bar {
+   position: absolute;
+  height: 50px;
+  top: 0px;
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: pointer;
+  min-width: 4px;
+  z-index: 5;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.task-bar:hover {
+ transform: scale(1.02);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+  z-index: 10;
+}
+.timeline-task-row.hovered .task-bar {
+  box-shadow: 0 0 0 2px white, 0 4px 12px rgba(0,0,0,0.2);
+  transform: scale(1.02);
+  z-index: 15;
+}
+.task-bar.completed {
+  background: #22c55e;
+}
+
+.task-bar.in-progress {
+  background: #3b82f6;
+}
+
+.task-bar.not-started {
+  background: #94a3b8;
+}
+
+.task-bar.overdue {
+  background: #ef4444 !important;
+}
+
+.task-progress {
+  height: 100%;
+  background: rgba(255,255,255,0.3);
 }
 </style>
